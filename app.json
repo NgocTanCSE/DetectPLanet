@@ -7,12 +7,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.agriscan.ai",
@@ -27,7 +21,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "package": "com.agriscan.ai",
       "versionCode": 1,
       "permissions": [
@@ -46,6 +39,16 @@
           "photosPermission": "AgriScan AI cần truy cập thư viện ảnh để chọn ảnh lá cây.",
           "cameraPermission": "AgriScan AI cần truy cập camera để chụp ảnh lá cây.",
           "microphonePermission": false
+        }
+      ],
+      "expo-font",
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
         }
       ]
     ],
