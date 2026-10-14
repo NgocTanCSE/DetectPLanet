@@ -1,0 +1,83 @@
+# ─────────────────────────────────────────────────────────────────────────
+# AgriScan AI — Unified Docker Compose (ALL services in ONE file)
+#
+# Services: PostgreSQL + PHP API
+# AI inference: Cloudflare Workers AI (@cf/meta/llama-3.2-11b-vision-instruct)
+#
+# ── Single command to bring the entire system up: ──
+#     docker compose --profile full up --build -d   # full stack (with PostgreSQL)
+#     docker compose up --build -d                   # serverless MVP (no DB)
+# ── Useful commands ──
+#     docker compose logs -f     # follow all logs
+#     docker compose down -v     # stop + destroy volumes (clean reset)
+#     docker compose ps          # show running containers
+#
+# ── Deploy the Cloudflare Worker (run once): ──
+#     cd workers/ai-worker
+#     npm install
+#     npx wrangler deploy --env production
+# ─────────────────────────────────────────────────────────────────────────
+services:
+  # ── PostgreSQL Database (only started in "full" profile) ─────────────
+  postgres:
+    profiles: ["full"]
+    image: postgres:16-alpine
+    container_name: agriscan-postgres
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-agriscan}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_DB: agriscan
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Init scripts run once on first (empty) container startup:
+      #   init.sql      -> schema + base seed
+      #   seed_data.sql -> extended seed (scans, articles, guides)
+      - ./db/agriscan_schema_postgres.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./db/seed_data.sql:/docker-entrypoint-initdb.d/seed_data.sql:ro
+
+  # ── PHP API ──────────────────────────────────────────────────────────
+  # Serves the REST API (auth, scan, analyze, chat) on port 887.
+  # AI inference is offloaded to Cloudflare Workers AI (no local AI container).
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: agriscan-api
+    restart: unless-stopped
+    ports:
+      - "887:80"                   # Expose API on port 887 (matches app.json extra.apiUrl)
+    env_file:
+      - .env
+    environment:
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-agriscan}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      DB_DRIVER: ${DB_DRIVER:-pgsql}
+      # Cloudflare Workers AI endpoint (replaces old local AI model)
+      AI_ENDPOINT: ${AI_ENDPOINT:-https://agriscan-ai.workers.dev/predict}
+      CHAT_ENDPOINT: ${CHAT_ENDPOINT:-https://agriscan-ai.workers.dev/chat}
+      AI_BEARER: ${CLOUDFLARE_API_TOKEN}
+      AI_TIMEOUT: ${AI_TIMEOUT:-60}
+      # Google OAuth
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-com.agriscan.ai://auth}
+      # CORS
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+    volumes:
+      - ./db/api/uploads:/var/www/html/uploads
+    depends_on:
+      postgres: { condition: service_healthy, required: false }  # postgres optional — API runs in mock mode if DB unavailable
+
+volumes:
+  postgres_data:

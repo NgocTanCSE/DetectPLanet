@@ -1,0 +1,52 @@
+# wrangler.toml — Cloudflare Workers configuration for AgriScan AI
+# Deploy:
+#   cd workers/ai-worker
+#   npm install
+#   npx wrangler deploy --env production
+
+name = "agriscan-ai"
+main = "src/index.js"
+compatibility_date = "2025-01-15"
+account_id = "5c8db92ca1adcb0f726c4fe451ab8e5b"
+
+[vars]
+VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+CHAT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"
+PREDICT_MAX_TOKENS = 2048
+CHAT_MAX_TOKENS = 1024
+
+[ai]
+binding = "AI"
+
+[triggers]
+crons = ["*/5 * * * *"]
+
+# ── Staging environment ─────────────────────────────────────────────────
+[env.staging]
+name = "agriscan-ai-staging"
+main = "src/index.js"
+compatibility_date = "2025-01-15"
+
+[env.staging.vars]
+VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+CHAT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"
+PREDICT_MAX_TOKENS = 2048
+CHAT_MAX_TOKENS = 1024
+
+[env.staging.ai]
+binding = "AI"
+
+# ── Production environment ──────────────────────────────────────────────
+[env.production]
+name = "agriscan-ai"
+main = "src/index.js"
+compatibility_date = "2025-01-15"
+
+[env.production.vars]
+VISION_MODEL = "@cf/meta/llama-3.2-11b-vision-instruct"
+CHAT_MODEL = "@cf/meta/llama-3.1-8b-instruct-fp8"
+PREDICT_MAX_TOKENS = 2048
+CHAT_MAX_TOKENS = 1024
+
+[env.production.ai]
+binding = "AI"

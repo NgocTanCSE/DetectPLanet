@@ -1,0 +1,47 @@
+{
+  "name": "myapp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "web:export": "expo export --platform web",
+    "emu": "emulator -avd dtct -no-audio -no-boot-anim",
+    "validate": "node _validate.js",
+    "up": "./up.sh",
+    "up:build": "./up.sh build",
+    "up:logs": "./up.sh --logs",
+    "up:serverless": "./up.sh serverless",
+    "down": "docker compose down -v",
+    "logs": "docker compose logs -f",
+    "ps": "docker compose ps",
+    "db:psql": "docker exec -it agriscan-postgres psql -U postgres -d agriscan",
+    "ai:dev": "cd workers/ai-worker && npm run dev",
+    "ai:deploy": "cd workers/ai-worker && npm run deploy:prod",
+    "ai:health": "curl -s $AI_ENDPOINT/health 2>/dev/null || echo 'Worker not deployed yet'"
+  },
+  "dependencies": {
+    "@expo-google-fonts/geist": "~0.4.0",
+    "@expo-google-fonts/plus-jakarta-sans": "~0.4.0",
+    "@expo-google-fonts/space-grotesk": "~0.4.0",
+    "@expo/vector-icons": "^15.0.3",
+    "expo": "~54.0.35",
+    "expo-constants": "~18.0.14",
+    "expo-font": "~14.0.12",
+    "expo-image-picker": "~17.0.11",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-svg": "15.12.1",
+    "react-native-web": "^0.21.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@types/react": "~19.1.10",
+    "playwright": "^1.64.0",
+    "typescript": "~5.9.2"
+  }
+}

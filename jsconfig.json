@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "jsx": "react-native",
+    "skipLibCheck": true,
+    "checkJs": false,
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": [
+    "index.js",
+    "frontend/App.js",
+    "frontend/theme.js",
+    "frontend/useFonts.js",
+    "frontend/icons.js",
+    "frontend/AppHeader.js",
+    "frontend/BottomNav.js",
+    "frontend/ProgressCircle.js",
+    "frontend/auth.js",
+    "frontend/LoginScreen.js",
+    "frontend/dto.js",
+    "frontend/api.js",
+    "frontend/home/code.js",
+    "frontend/scan/code.js",
+    "frontend/camera/code.js",
+    "frontend/result/code.js",
+    "frontend/history/code.js",
+    "frontend/chat/code.js"
+  ],
+  "exclude": ["node_modules"]
+}

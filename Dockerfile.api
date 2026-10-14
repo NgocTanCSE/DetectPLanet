@@ -1,0 +1,52 @@
+# ─────────────────────────────────────────────────────────────────────────
+# AgriScan AI — PHP API Dockerfile
+# Multi-stage build: PHP 8.2 with Apache + required extensions
+# ─────────────────────────────────────────────────────────────────────────
+FROM php:8.2-apache
+
+# Install system + PHP extensions needed by AgriScan
+#   pdo, pdo_pgsql, pdo_mysql  — database access
+#   mbstring                   — UTF-8 string handling
+#   gd                         — image processing (future enhancement)
+#   zip                        — archive handling (future enhancement)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpng-dev \
+    libzip-dev \
+    libonig-dev \
+    libpq-dev \
+    unzip \
+    curl \
+    && docker-php-ext-install \
+    pdo \
+    pdo_pgsql \
+    pdo_mysql \
+    mbstring \
+    zip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Enable Apache mod_rewrite for clean URLs
+RUN a2enmod rewrite
+
+# Create uploads directory with correct permissions
+RUN mkdir -p /var/www/html/uploads && chown -R www-data:www-data /var/www/html/uploads
+
+# Copy API source files
+COPY db/api/index.php /var/www/html/index.php
+COPY db/api/config.php /var/www/html/config.php
+COPY db/api/.htaccess /var/www/html/.htaccess
+COPY db/api/uploads/ /var/www/html/uploads/
+
+# Set proper permissions on code
+RUN chown -R www-data:www-data /var/www/html/*.php
+
+# Environment variables are injected at runtime via docker-compose
+ARG AI_ENDPOINT=http://ai:8000/predict
+ENV AI_ENDPOINT ${AI_ENDPOINT}
+
+EXPOSE 80
+
+# Health check — verify Apache + PHP responds (does NOT require DB for serverless MVP)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+  CMD curl --fail --silent --max-time 5 http://127.0.0.1/ > /dev/null || exit 1
+
+CMD ["apache2-foreground"]

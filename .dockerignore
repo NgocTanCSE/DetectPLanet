@@ -1,0 +1,38 @@
+# Node / Expo
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Version control
+.git/
+.gitignore
+.claude/
+
+# Docker / CI
+Dockerfile.*
+docker-compose*.yml
+.dockerignore
+.docker/
+
+# Environment (never bake secrets into images)
+.env
+.env.*
+
+# Python / AI cache
+__pycache__/
+*.pyc
+*.pyo
+db/AI/.venv/
+db/AI/__pycache__/
+
+# Database
+db/*.sqlite
+*.db
+
+# IDE / OS
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

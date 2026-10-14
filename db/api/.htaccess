@@ -1,0 +1,10 @@
+# Route clean URLs (/home, /scan/session, ...) to the single API router.
+# Drop this file in the same dir as index.php on an Apache server.
+
+# Pass Authorization header to PHP (Apache + mod_php strips it by default)
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]

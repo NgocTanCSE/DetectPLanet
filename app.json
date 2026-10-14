@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "scheme": "agriscan",
+    "name": "AgriScan AI",
+    "slug": "agriscan-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.agriscan.ai",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "AgriScan AI cần truy cập camera để chụp ảnh lá cây phân tích bệnh.",
+        "NSPhotoLibraryUsageDescription": "AgriScan AI cần truy cập thư viện ảnh để chọn ảnh lá cây đã chụp trước đó."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.agriscan.ai",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "AgriScan AI cần truy cập thư viện ảnh để chọn ảnh lá cây.",
+          "cameraPermission": "AgriScan AI cần truy cập camera để chụp ảnh lá cây.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "apiUrl": "",
+      "googleClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+      "imagePickerQuality": 0.8,
+      "imagePickerBase64": true
+    }
+  }
+}

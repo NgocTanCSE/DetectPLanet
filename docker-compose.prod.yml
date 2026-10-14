@@ -1,0 +1,35 @@
+# ─────────────────────────────────────────────────────────────────────────
+# AgriScan AI — Production SSL Overlay
+#
+# Extends docker-compose.yml with HTTPS (SSL termination).
+# Mounts a production nginx config + Let's Encrypt certs at runtime.
+#
+# Usage:
+#   docker compose \
+#     -f docker-compose.yml \
+#     -f docker-compose.prod.yml up --build -d
+#
+# Before deploying:
+#   - Set NGINX_HOST in .env (your domain, e.g. agriscan.ai)
+#   - Generate certs:  certbot certonly --standalone -d $NGINX_HOST
+#   - Copy to:        ./nginx/certs/fullchain.pem
+#                     ./nginx/certs/privkey.pem
+#     OR use Cloudflare Tunnel for automatic SSL
+# ─────────────────────────────────────────────────────────────────────────
+services:
+  web:
+    image: nginx:alpine
+    container_name: agriscan-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Override the HTTP nginx.conf with the SSL-enabled production config
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      # Mount SSL certificates (Let's Encrypt or self-signed)
+      - ./nginx/certs:/etc/nginx/certs:ro
+      # Static assets (Expo web build) — if you have a web build
+      - ./web-build:/usr/share/nginx/html:ro
+    depends_on:
+      api: { condition: service_started }
