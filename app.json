@@ -1,6 +1,6 @@
 {
   "expo": {
-    "scheme": "agriscan",
+    "scheme": ["agriscan", "com.agriscan.ai"],
     "name": "AgriScan AI",
     "slug": "agriscan-ai",
     "version": "1.0.0",

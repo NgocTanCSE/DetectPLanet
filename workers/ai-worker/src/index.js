@@ -118,6 +118,12 @@ export default {
       let imageData = body.image || body.base64 || '';
       const imageUri = body.imageUri || '';
 
+      // Workers AI vision model expects a data URL (data:image/jpeg;base64,...).
+      // If the caller sends raw base64 without the prefix, add it.
+      if (imageData && !imageData.startsWith('data:image/')) {
+        imageData = `data:image/jpeg;base64,${imageData}`;
+      }
+
       if (!imageData && imageUri) {
         try {
           imageData = await fetchImageAsBase64(imageUri);
@@ -146,7 +152,16 @@ export default {
       });
 
       const llmOutput = aiResponse?.response || '';
-      const result = parseLLMJson(llmOutput);
+
+      // Workers AI vision model may return response as a parsed object
+      // (when the prompt requests structured JSON) or as a text string.
+      // Handle both cases so we never crash on parse.
+      let result;
+      if (typeof llmOutput === 'object' && llmOutput !== null && llmOutput.crop !== undefined) {
+        result = llmOutput;  // Already a parsed JSON object from the model
+      } else {
+        result = parseLLMJson(llmOutput);
+      }
 
       if (!result) {
         // Fallback: return a structured error that mimics the old API shape
@@ -196,7 +211,9 @@ export default {
         top_p: 0.9,
       });
 
-      const response = aiResponse?.response || '';
+      const responseRaw = aiResponse?.response || '';
+      // Chat model returns text string; just in case it's an object, stringify it
+      const response = typeof responseRaw === 'string' ? responseRaw : JSON.stringify(responseRaw);
 
       return Response.json({
         role: 'assistant',

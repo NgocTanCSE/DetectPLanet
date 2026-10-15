@@ -11,7 +11,8 @@
  * per the HTML→JS conversion request.
  */
 import React, { useState, Component, useEffect } from 'react';
-import { SafeAreaView, StatusBar, View, Text } from 'react-native';
+import { StatusBar, View, Text } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, typography } from './theme';
 import BottomNav from './BottomNav';
@@ -175,28 +176,32 @@ export default function App() {
       params: {},
     };
     return (
-      <ErrorBoundary>
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.paper }}>
-          <StatusBar barStyle="dark-content" backgroundColor={colors.paper} />
-          <LoginScreen navigation={loginNav} />
-        </SafeAreaView>
-      </ErrorBoundary>
+      <SafeAreaProvider>
+        <ErrorBoundary>
+          <SafeAreaView style={{ flex: 1, backgroundColor: colors.paper }}>
+            <StatusBar barStyle="dark-content" backgroundColor={colors.paper} />
+            <LoginScreen navigation={loginNav} />
+          </SafeAreaView>
+        </ErrorBoundary>
+      </SafeAreaProvider>
     );
   }
 
   return (
     <ErrorBoundary>
-      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-        <StatusBar barStyle="dark-content" backgroundColor={colors.paper} />
-        <ActiveScreen navigation={navigation} route={{ params }} />
-        <BottomNav
-          activeTab={SCREEN_TO_TAB[screen] || 'home'}
-          onTabPress={(tab) => {
-            setParams({});
-            setScreen(tab);
-          }}
-        />
-      </SafeAreaView>
+      <SafeAreaProvider>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <StatusBar barStyle="dark-content" backgroundColor={colors.paper} />
+          <ActiveScreen navigation={navigation} route={{ params }} />
+          <BottomNav
+            activeTab={SCREEN_TO_TAB[screen] || 'home'}
+            onTabPress={(tab) => {
+              setParams({});
+              setScreen(tab);
+            }}
+          />
+        </SafeAreaView>
+      </SafeAreaProvider>
     </ErrorBoundary>
   );
 }

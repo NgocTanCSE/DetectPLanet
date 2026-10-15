@@ -194,6 +194,15 @@ const svgStub = {
   default: 'Svg',
 };
 
+// Stub for react-native-safe-area-context (Expo native module).
+// SafeAreaProvider wraps the app; SafeAreaView is used as a regular View.
+const safeAreaStub = {
+  SafeAreaProvider: ({ children }) => children,
+  SafeAreaView: 'SafeAreaView',
+  useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  default: { SafeAreaProvider: ({ children }) => children, SafeAreaView: 'SafeAreaView' },
+};
+
 const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'react') return reactStub;
@@ -201,6 +210,7 @@ Module._load = function (request, parent, isMain) {
   if (request === 'expo-image-picker') return imagePickerStub;
   if (request === 'expo-crypto') return expoCryptoStub;
   if (request === 'react-native-svg') return svgStub;
+  if (request === 'react-native-safe-area-context') return safeAreaStub;
   return origLoad.apply(this, arguments);
 };
 

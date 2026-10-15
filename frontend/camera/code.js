@@ -17,7 +17,7 @@ import {
   Alert,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { colors, typography, spacing, shadowPaper } from '../theme';
+import { colors, typography, spacing, shadowCard, shadowPaper } from '../theme';
 import Icon from '../icons';
 import AppHeader from '../AppHeader';
 import { emptyCapture } from '../dto';
