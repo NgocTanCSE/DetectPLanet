@@ -28,18 +28,27 @@ const AppHeader = ({
       <View style={styles.headerInner}>
         {/* LEFT */}
         <View style={styles.left}>
-          {showBack ? (
-            <TouchableOpacity
-              accessibilityLabel="Quay lại"
-              style={styles.backBtn}
-              onPress={onBack}>
-              <Icon name="arrow_back_ios_new" size={18} color={colors['on-surface']} />
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.logoBadge}>
-              <Icon name="eco" size={17} color={colors.primary} />
-            </View>
-          )}
+   {showBack ? (
+             <TouchableOpacity
+               accessibilityLabel="Quay lại"
+               style={[
+                   styles.backBtn,
+                   Platform.OS === 'web'
+                     ? {
+                         cursor: 'pointer',
+                         WebkitUserSelect: 'none',
+                         userSelect: 'none',
+                       }
+                     : {},
+                 ]}
+               onPress={onBack}>
+               <Icon name="arrow_back_ios_new" size={18} color={colors['on-surface']} />
+             </TouchableOpacity>
+           ) : (
+             <View style={styles.logoBadge}>
+               <Icon name="eco" size={17} color={colors.primary} />
+             </View>
+           )}
 
           <View>
             <Text style={styles.title}>{title}</Text>
@@ -47,17 +56,26 @@ const AppHeader = ({
           </View>
         </View>
 
-        {/* RIGHT */}
-        <View style={styles.right}>
-          {actions.map((a, i) => (
-            <TouchableOpacity
-              key={a.label || i}
-              accessibilityLabel={a.label}
-              style={styles.actionBtn}
-              onPress={a.onPress}>
-              <Icon name={a.icon} size={a.size || 18} color={a.color || colors['on-surface-variant']} />
-            </TouchableOpacity>
-          ))}
+         {/* RIGHT */}
+         <View style={styles.right}>
+           {actions.map((a, i) => (
+             <TouchableOpacity
+               key={a.label || i}
+               accessibilityLabel={a.label}
+               style={[
+                   styles.actionBtn,
+                   Platform.OS === 'web'
+                     ? {
+                         cursor: 'pointer',
+                         WebkitUserSelect: 'none',
+                         userSelect: 'none',
+                       }
+                     : {},
+                 ]}
+               onPress={a.onPress}>
+               <Icon name={a.icon} size={a.size || 18} color={a.color || colors['on-surface-variant']} />
+             </TouchableOpacity>
+           ))}
 
           {user?.avatar && !user.avatar.includes('favicon.ico') ? (
             <Image source={{ uri: user.avatar }} style={styles.profile} />

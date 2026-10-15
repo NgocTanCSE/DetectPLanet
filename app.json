@@ -1,6 +1,9 @@
 {
   "expo": {
-    "scheme": ["agriscan", "com.agriscan.ai"],
+    "scheme": [
+      "agriscan",
+      "com.agriscan.ai"
+    ],
     "name": "AgriScan AI",
     "slug": "agriscan-ai",
     "version": "1.0.0",
@@ -51,7 +54,8 @@
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "extra": {
       "apiUrl": "http://192.168.2.188:887",

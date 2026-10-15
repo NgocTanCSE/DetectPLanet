@@ -75,12 +75,16 @@ const HistoryScreen = ({ navigation }) => {
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [records, setRecords] = useState([]);
+  const [filters, setFilters] = useState([{ key: 'all', label: 'Tất cả', icon: 'apps' }]);
 
   useEffect(() => {
     const load = async () => {
       try {
         const d = await fetchHistory();
         setRecords(d.records || []);
+        if (Array.isArray(d.filters) && d.filters.length > 0) {
+          setFilters(d.filters);
+        }
       } catch {
         /* no backend */
       }
@@ -127,6 +131,8 @@ const HistoryScreen = ({ navigation }) => {
       <AppHeader
         title="Nhật ký chẩn đoán"
         subtitle="Lịch sử"
+        showBack
+        onBack={() => navigation?.navigate?.('home')}
         actions={[{ icon: 'notifications', label: 'Thông báo', onPress: () => Linking.openSettings() }]}
       />
 
@@ -159,7 +165,7 @@ const HistoryScreen = ({ navigation }) => {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
-          {FILTER_PILLS.map((p) => {
+          {filters.map((p) => {
             const active = activeFilter === p.key;
             return (
               <TouchableOpacity

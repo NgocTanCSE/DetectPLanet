@@ -75,58 +75,45 @@ const SCREEN_TO_TAB = {
   settings: 'settings',
 };
 
-// Placeholder screens for nav items that have no dedicated HTML source yet
-function PlaceholderScreen({ title, body }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader title={title} />
-      <View style={{ paddingTop: 56, paddingBottom: 96, paddingHorizontal: 16, gap: 16 }}>
-        <Text style={[typography.headline.sm, { color: colors['on-surface'] }]}>{title}</Text>
-        <Text style={[typography.body.md, { color: colors.muted }]}>{body}</Text>
-      </View>
-    </View>
-  );
-}
+// Real screens for the remaining nav tabs (were placeholders before)
+import GuidesScreen from './guides/code';
+import SettingsScreen from './settings/code';
 
-function GuidesScreen() {
-  return (
-    <PlaceholderScreen
-      title="Cẩm nang"
-      body="Tài liệu cẩm nang kỹ thuật canh tác và phòng trừ sâu bệnh đang được hoàn thiện."
-    />
-  );
+// ── Auth gate ───────────────────────────────────────────────────────────
+// The Google OAuth flow is fully implemented (auth.js + LoginScreen +
+// /auth/google backend). The gate is OFF by default so the app is usable
+// without Google credentials; flip it on for production by setting
+// `expo.extra.requireAuth = true` in app.json once GOOGLE_CLIENT_ID /
+// GOOGLE_CLIENT_SECRET are configured. NO fake user is ever injected.
+function isAuthRequired() {
+  try {
+    const { expoConfig } = require('expo-constants');
+    return !!(expoConfig && expoConfig.extra && expoConfig.extra.requireAuth);
+  } catch {
+    return false;
+  }
 }
-function SettingsScreen() {
-  return (
-    <PlaceholderScreen
-      title="Cài đặt"
-      body="Tùy chỉnh thông báo, tài khoản và đồng bộ dữ liệu nhật ký đồng ruộng."
-    />
-  );
-}
-
-// ── Set to false to re-enable Google login gate ──
-const SKIP_AUTH = true;
+const REQUIRE_AUTH = isAuthRequired();
 
 export default function App() {
   const { loaded: fontsLoaded } = useFonts();
   const [screen, setScreen] = useState('home');
   const [params, setParams] = useState({});
-  const [user, setUser] = useState(SKIP_AUTH ? { name: 'Dev', email: 'dev@local' } : null);
-  const [authReady, setAuthReady] = useState(SKIP_AUTH ? true : false);
+  const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(!REQUIRE_AUTH);
 
-  // Check session on startup (skipped when SKIP_AUTH is on)
+  // Check persisted session on startup (only when the gate is on)
   useEffect(() => {
-    if (SKIP_AUTH) return;
+    if (!REQUIRE_AUTH) return;
     verifySession().then((u) => {
       setUser(u);
       setAuthReady(true);
     });
   }, []);
 
-  // Subscribe to auth changes (skipped when SKIP_AUTH is on)
+  // Subscribe to auth changes (only when the gate is on)
   useEffect(() => {
-    if (SKIP_AUTH) return;
+    if (!REQUIRE_AUTH) return;
     const unsub = onAuthStateChanged((u) => setUser(u));
     return unsub;
   }, []);

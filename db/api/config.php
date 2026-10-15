@@ -48,31 +48,35 @@ try {
 }
 
 /**
- * AgriScan AI inference client — Cloudflare Workers AI endpoint.
+ * AgriScan AI inference client — Cloudflare Workers AI REST API.
  *
- * The old local model inference stack has been migrated to Cloudflare Workers AI.
- * (vision model: @cf/meta/llama-3.2-11b-vision-instruct, see wrangler.toml).
- * The Worker URL replaces the old Colab/ngrok endpoint.
+ * The PHP API calls the Cloudflare Workers AI REST endpoint DIRECTLY
+ * (no intermediate worker needed):
+ *   POST https://api.cloudflare.com/client/v4/accounts/{ACCOUNT_ID}/ai/run/{model}
+ * Auth: Authorization: Bearer <CLOUDFLARE_API_TOKEN>
+ *   Token needs: Account → Workers AI (Edit).
  *
- * Set AI_ENDPOINT in your environment to the Worker URL, e.g.:
- *   https://agriscan-ai.your-subdomain.workers.dev/predict
+ * Env vars (set these on your hosting platform / docker-compose .env):
+ *   CLOUDFLARE_ACCOUNT_ID  Cloudflare account ID
+ *   CLOUDFLARE_API_TOKEN   Cloudflare API token with Workers AI Edit permission
+ *   CLOUDFLARE_VISION_MODEL  vision model id (default @cf/meta/llama-3.2-11b-vision-instruct)
+ *   CLOUDFLARE_CHAT_MODEL    chat model id   (default @cf/meta/llama-3.1-8b-instruct-fp8)
+ *   AI_TIMEOUT             (optional) seconds to wait per inference, default 90
  *
- * AI_BEARER is the Cloudflare API token (if authentication is configured).
- * AI_TIMEOUT: seconds to wait for the vision model to respond (default 60).
- *
- * Env vars (set these on your hosting platform):
- *   AI_ENDPOINT  Cloudflare Worker predict URL
- *   AI_BEARER    (optional) Cloudflare API token for auth
- *   AI_TIMEOUT   (optional) seconds, default 60
- *   CLOUDFLARE_ACCOUNT_ID  (for direct Workers AI API calls)
+ * Legacy override: if AI_ENDPOINT / CHAT_ENDPOINT are set, they are used as
+ * full URLs instead (e.g. a self-hosted worker deployment).
  */
 $AI = [
-    'endpoint' => getenv('AI_ENDPOINT') ?: 'https://agriscan-ai.workers.dev/predict',
-    'chat_endpoint' => getenv('CHAT_ENDPOINT') ?: 'https://agriscan-ai.workers.dev/chat',
-    'username' => getenv('AI_USERNAME') ?: '',
-    'api_key'  => getenv('AI_API_KEY') ?: '',
-    'bearer'   => getenv('AI_BEARER') ?: getenv('CLOUDFLARE_API_TOKEN') ?: '',
-    'timeout'  => (int) (getenv('AI_TIMEOUT') ?: 60),
+    'account_id'      => getenv('CLOUDFLARE_ACCOUNT_ID') ?: '',
+    'api_token'       => getenv('CLOUDFLARE_API_TOKEN') ?: getenv('AI_BEARER') ?: '',
+    'vision_model'    => getenv('CLOUDFLARE_VISION_MODEL') ?: '@cf/meta/llama-3.2-11b-vision-instruct',
+    'chat_model'      => getenv('CLOUDFLARE_CHAT_MODEL')   ?: '@cf/meta/llama-3.1-8b-instruct-fp8',
+    'endpoint'        => getenv('AI_ENDPOINT') ?: '',     // legacy full-URL override (/predict)
+    'chat_endpoint'   => getenv('CHAT_ENDPOINT') ?: '',   // legacy full-URL override (/chat)
+    'username'        => getenv('AI_USERNAME') ?: '',
+    'api_key'         => getenv('AI_API_KEY') ?: '',
+    'bearer'          => getenv('AI_BEARER') ?: getenv('CLOUDFLARE_API_TOKEN') ?: '',
+    'timeout'         => (int) (getenv('AI_TIMEOUT') ?: 90),
 ];
 
 /**

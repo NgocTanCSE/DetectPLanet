@@ -24,8 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     && rm -rf /var/lib/apt/lists/*
 
-# Enable Apache mod_rewrite for clean URLs
-RUN a2enmod rewrite
+# Enable Apache mod_rewrite for clean URLs + AllowOverride so .htaccess works
+RUN a2enmod rewrite \
+    && sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
 # Create uploads directory with correct permissions
 RUN mkdir -p /var/www/html/uploads && chown -R www-data:www-data /var/www/html/uploads
@@ -45,9 +46,9 @@ ENV AI_ENDPOINT ${AI_ENDPOINT}
 
 EXPOSE 80
 
-# Health check — verify Apache + PHP responds (does NOT require DB for serverless MVP)
+# Health check — verify Apache + PHP respond AND the API router answers
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD curl --fail --silent --max-time 5 "http://127.0.0.1:${PORT:-80}/" > /dev/null || exit 1
+  CMD curl --fail --silent --max-time 5 "http://127.0.0.1:${PORT:-80}/health" > /dev/null || exit 1
 
 # Support dynamic PORT injection from Render/Railway/Fly
 CMD ["sh", "-c", "sed -i \"s/80/${PORT:-80}/g\" /etc/apache2/ports.conf /etc/apache2/sites-available/000-default.conf && exec apache2-foreground"]

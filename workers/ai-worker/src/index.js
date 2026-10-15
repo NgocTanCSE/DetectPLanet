@@ -1,22 +1,18 @@
 /**
  * AgriScan AI — Cloudflare Worker (replaces FastAPI AI service)
  *
- * Provides two endpoints:
+ * Provides three endpoints:
  *   POST /predict — Diagnose plant leaf disease from image (vision model)
- *   POST /chat     — AI chat for disease Q&A / agronomic advice (text model)
- *   GET  /health   — Health check for Docker compose dependency checks
+ *   POST /chat    — AI chat for disease Q&A / agronomic advice (text model)
+ *   GET  /health  — Health check for Docker compose dependency checks
  *
- * Replaces the local FastAPI + PyTorch stack with Cloudflare Workers AI.
- * The vision model (Llama 3.2-Vision 11B) replaces the custom PyTorch model.
- * No custom model training needed — the LLM reasons about plant diseases
- * from leaf images with a structured prompt.
+ * Security: when the AI_SHARED_SECRET secret is set on this worker
+ * (`wrangler secret put AI_SHARED_SECRET`), every /predict and /chat request
+ * must include `Authorization: Bearer <secret>`. The PHP API sends this via
+ * its AI_BEARER env var. /health stays open for uptime probes.
  *
  * @see https://developers.cloudflare.com/workers-ai/
  */
-
-// Disease classification categories (kept for reference; LLM returns labels directly)
-// The vision model is a general-purpose image classifier, not plant-disease-specific,
-// so we prompt-engineer it to produce structured plant disease output.
 
 const PREDICT_PROMPT = `Bạn là chuyên gia bác học thực vật. Phân tích hình ảnh lá cây bên dưới.
 
@@ -33,15 +29,20 @@ Trả về KẾT QUẢ TRONG ĐỊNH DẠNG JSON SAU ĐÂY, không được thê
   "severity": "healthy | warning | danger",
   "confidence": số thực từ 0 đến 100 (độ tin cậy dự đoán),
   "recommendation": "lời khuyên chăm sóc bằng tiếng Việt (phun thuốc, bón phân, tưới nước, cắt lá bệnh, đất, ánh sáng...)",
+  "regions": [
+    {"top": "32%", "left": "38%", "confidence": số từ 0 đến 100, "severity": "healthy | warning | danger"}
+  ],
   "topk": [
-    {"label": "tên bệnh", "display_label": "tên hiển thị", "score": số},
-    {"label": "tên bệnh 2", "display_label": "tên hiển thị 2", "score": số}
+    {"label": "tên bệnh", "display_label": "tên hiển thị", "score": số từ 0 đến 100},
+    {"label": "tên bệnh 2", "display_label": "tên hiển thị 2", "score": số từ 0 đến 100}
   ]
 }
 
-Hỗ trợ nhận diện mọi loài cây: lúa, cà chua, đậu, khoai tây, bắp, ngô, cây công, cây băm, trà, cà phê, chuối, xoài, dưa chuột, dâu, dưa hấu, và các cây trồng khác.
+Về "regions": xác định vị trí ƯỚC TÍNH các vùng bất thường trên lá (đốm bệnh, vàng lá, cháy lá...) và biểu diễn bằng toạ độ phần trăm relative đến ảnh. Nếu lá khỏe hoặc không thấy vùng bất thường rõ ràng thì "regions": [] (mảng rỗng — KHÔNG ĐƯỢC bịa vị trí).
 
-Nếu lá khỏe mạnh (healthy): confidence = 100, severity = "healthy", disease = "None", recommendation = "Cây khỏe, không cần điều trị.".json`;
+Hỗ trợ nhận diện mọi loài cây: lúa, cà chua, đậu, khoai tây, bắp, ngô, cây công nghiệp, chè, cà phê, chuối, xoài, dưa chuột, dâu, dưa hấu, và các cây trồng khác.
+
+Nếu lá khỏe mạnh (healthy): confidence = 100, severity = "healthy", disease = "None", regions = [], recommendation = "Cây khỏe, không cần điều trị.".json`;
 
 const CHAT_SYSTEM_PROMPT = `Bạn là trợ lý AI chuyên về nông nghiệp, điều trị bệnh thực vật. Trả lời ngắn gọn, thực tế, bằng tiếng Việt. Luôn ưu tiên giải pháp hữu cơ và an toàn cho môi trường.`;
 
@@ -65,31 +66,66 @@ async function fetchImageAsBase64(url) {
 }
 
 /**
- * Parse JSON from LLM response (handles code fences).
+ * Parse JSON from LLM response (handles code fences + stray prose around JSON).
  */
 function parseLLMJson(text) {
-  // LLM responses may wrap JSON in ```json ... ```
+  if (typeof text !== 'string' || !text.trim()) return null;
   let jsonStr = text.trim();
-  const fenceMatch = jsonStr.match(/```\w*\n?([\s\S]*?)\n?```/);
+  const fenceMatch = jsonStr.match(/```[a-zA-Z]*\s*([\s\S]*?)\s*```/);
   if (fenceMatch) {
     jsonStr = fenceMatch[1].trim();
+  }
+  if (!jsonStr.startsWith('{')) {
+    // Model added prose around the JSON — extract the outermost {...} block.
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
   }
   try {
     return JSON.parse(jsonStr);
   } catch (e) {
-    // Return a best-effort fallback
     return null;
   }
 }
+
+/** Clamp confidence to a 0-100 number (handles models returning 0-1 fractions). */
+function normalizeConfidence(value) {
+  const n = Number(value);
+  if (!isFinite(n) || n < 0) return 0;
+  const pct = n <= 1 ? n * 100 : n;
+  return Math.round(Math.min(100, pct) * 10) / 10;
+}
+
+/** Force severity into the allowed enum; derive a safe default when invalid. */
+function normalizeSeverity(value, confidence) {
+  const sev = String(value || '').toLowerCase();
+  if (sev === 'healthy' || sev === 'warning' || sev === 'danger') return sev;
+  return confidence >= 70 ? 'warning' : 'danger';
+}
+
+/**
+ * Optional shared-secret auth: when AI_SHARED_SECRET is set on the worker,
+ * every /predict and /chat request must carry `Authorization: Bearer <secret>`.
+ * Without the secret configured the worker stays open (local dev) — production
+ * MUST set it via `wrangler secret put AI_SHARED_SECRET`.
+ */
+function isAuthorized(request, env) {
+  if (!env.AI_SHARED_SECRET) return true;
+  const header = request.headers.get('Authorization') || '';
+  return header === `Bearer ${env.AI_SHARED_SECRET}`;
+}
+
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     const path = url.pathname.replace(/^\/+|\/+$/g, '');
 
-    // CORS headers (restrict to same origin unless configured)
+    // CORS headers (worker is called server-side from PHP)
     const corsHeaders = {
-      'Access-Control-Allow-Origin': '*', // Worker is called server-side from PHP
+      'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',
@@ -103,13 +139,20 @@ export default {
     const visionModel = env.VISION_MODEL || '@cf/meta/llama-3.2-11b-vision-instruct';
     const chatModel = env.CHAT_MODEL || '@cf/meta/llama-3.1-8b-instruct-fp8';
 
-    // ── Health check ──────────────────────────────────────────────────
+    // ── Health check (open — used by Docker healthchecks / uptime probes) ──
     if (path === 'health' || path === 'api/health') {
       return Response.json({ status: 'ok', timestamp: new Date().toISOString() }, { headers: corsHeaders });
     }
 
     // ── POST /predict — plant disease diagnosis from leaf image ───────
     if (path === 'predict' || path === 'api/predict') {
+      if (!isAuthorized(request, env)) {
+        return Response.json(
+          { error: 'Unauthorized', message: 'Missing or invalid Authorization bearer token.' },
+          { status: 401, headers: corsHeaders }
+        );
+      }
+
       const body = await request.json().catch(() => ({}));
 
       // Accept either base64 image data or image URL
@@ -117,7 +160,6 @@ export default {
       const imageUri = body.imageUri || '';
 
       // Workers AI vision model expects a data URL (data:image/jpeg;base64,...).
-      // If the caller sends raw base64 without the prefix, add it.
       if (imageData && !imageData.startsWith('data:image/')) {
         imageData = `data:image/jpeg;base64,${imageData}`;
       }
@@ -141,45 +183,79 @@ export default {
       }
 
       // Call Workers AI vision model
-      const aiResponse = await env.AI.run(visionModel, {
-        prompt: PREDICT_PROMPT,
-        image: imageData,
-        max_tokens: 2048,
-        temperature: 0.3, // Low temperature for consistent classification
-        raw: false,
-      });
+      let aiResponse;
+      try {
+        aiResponse = await env.AI.run(visionModel, {
+          prompt: PREDICT_PROMPT,
+          image: imageData,
+          max_tokens: 2048,
+          temperature: 0.3,
+        });
+      } catch (e) {
+        return Response.json(
+          { error: 'AI inference failed', detail: e.message },
+          { status: 502, headers: corsHeaders }
+        );
+      }
 
       const llmOutput = aiResponse?.response || '';
 
-      // Workers AI vision model may return response as a parsed object
-      // (when the prompt requests structured JSON) or as a text string.
-      // Handle both cases so we never crash on parse.
+      // Vision model may return a parsed object or a text string — handle both.
       let result;
       if (typeof llmOutput === 'object' && llmOutput !== null && llmOutput.crop !== undefined) {
-        result = llmOutput;  // Already a parsed JSON object from the model
+        result = llmOutput;
       } else {
         result = parseLLMJson(llmOutput);
       }
 
       if (!result) {
-        // Fallback: return a structured error that mimics the old API shape
         return Response.json(
           { error: 'Could not parse AI response', raw_output: llmOutput },
           { status: 503, headers: corsHeaders }
         );
       }
 
-      // Build response matching the original FastAPI /predict format
+      // Normalize + validate every field (models are non-deterministic)
+      const confidence = normalizeConfidence(result.confidence);
+      const severity = normalizeSeverity(result.severity, confidence);
+
+      // Regions → validated detection boxes ONLY when the model returned them
+      const regions = Array.isArray(result.regions) ? result.regions : [];
+      const detections = regions
+        .filter((r) => r && typeof r === 'object')
+        .slice(0, 8) // cap bounding boxes to avoid abuse
+        .map((r, i) => {
+          const regConf = normalizeConfidence(r.confidence);
+          return {
+            id: 'd' + (i + 1),
+            top: String(r.top || '50%'),
+            left: String(r.left || '50%'),
+            confidence: regConf + '%',
+            severity: normalizeSeverity(r.severity, regConf),
+          };
+        });
+
+      // topk — normalized scores 0-100
+      const topk = (Array.isArray(result.topk) ? result.topk : [])
+        .slice(0, 5)
+        .map((t) => ({
+          label: t?.label || '',
+          display_label: t?.display_label || t?.label || '',
+          score: normalizeConfidence(t?.score),
+        }));
+
+      // Build response matching the PHP /analyze contract
       const diagnosis = {
         crop: result.crop || 'plant',
         crop_label: result.crop_label || result.crop || 'Cây trồng',
         disease: result.disease || result.disease_label || 'Unknown',
         disease_label: result.disease_label || result.disease || 'Chưa xác định',
         pathogen: result.pathogen || '',
-        severity: result.severity || 'healthy',
-        confidence: Math.round((result.confidence || 0) * 10) / 10,
+        severity,
+        confidence,
         recommendation: result.recommendation || 'Vui lòng tham khảo chuyên gia bán địa phương.',
-        topk: result.topk || [],
+        detections,
+        topk,
       };
 
       return Response.json(diagnosis, { headers: corsHeaders });
@@ -187,10 +263,17 @@ export default {
 
     // ── POST /chat — AI chat for disease Q&A ──────────────────────────
     if (path === 'chat' || path === 'api/chat') {
+      if (!isAuthorized(request, env)) {
+        return Response.json(
+          { error: 'Unauthorized', message: 'Missing or invalid Authorization bearer token.' },
+          { status: 401, headers: corsHeaders }
+        );
+      }
+
       const body = await request.json().catch(() => ({}));
       const messages = body.messages || [];
 
-      if (!messages.length) {
+      if (!Array.isArray(messages) || !messages.length) {
         return Response.json(
           { error: 'No messages provided. Expected: { messages: [{role, content}] }' },
           { status: 400, headers: corsHeaders }
@@ -202,15 +285,22 @@ export default {
         messages.unshift({ role: 'system', content: CHAT_SYSTEM_PROMPT });
       }
 
-      const aiResponse = await env.AI.run(chatModel, {
-        messages,
-        max_tokens: 1024,
-        temperature: 0.7,
-        top_p: 0.9,
-      });
+      let aiResponse;
+      try {
+        aiResponse = await env.AI.run(chatModel, {
+          messages,
+          max_tokens: 1024,
+          temperature: 0.7,
+          top_p: 0.9,
+        });
+      } catch (e) {
+        return Response.json(
+          { error: 'AI chat inference failed', detail: e.message },
+          { status: 502, headers: corsHeaders }
+        );
+      }
 
       const responseRaw = aiResponse?.response || '';
-      // Chat model returns text string; just in case it's an object, stringify it
       const response = typeof responseRaw === 'string' ? responseRaw : JSON.stringify(responseRaw);
 
       return Response.json({
@@ -224,3 +314,4 @@ export default {
     return Response.json({ error: 'Not found' }, { status: 404, headers: corsHeaders });
   },
 };
+

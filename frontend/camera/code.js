@@ -99,73 +99,73 @@ const CameraScreen = ({ navigation }) => {
   };
 
   // System fallback (web cannot use launchCameraAsync at all; native uses it).
-  const captureWithSystemCamera = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        Alert.alert(
-          'Máy ảnh trên web',
-          'Chụp trực tiếp không khả dụng trên trình duyệt web. Vui lòng chọn ảnh từ thư viện.',
-          [{ text: 'OK', onPress: openImageLibrary }],
-        );
-        return;
-      }
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted' && status !== undefined) {
-        Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền sử dụng Camera để chụp ảnh lá cây.');
-        return;
-      }
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: CAMERA_QUALITY,
-        base64: true,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        setCaptured({
-          uri: asset.uri,
-          base64: asset.base64,
-          crop: 'Mẫu lá chụp trực tiếp',
-          time: 'Vừa chụp xong',
-        });
-        setShowPreview(true);
-      }
-    } catch (err) {
-      Alert.alert(
-        'Không thể mở máy ảnh',
-        'Vui lòng thử lại hoặc chọn ảnh từ thư viện.',
-        [{ text: 'OK', onPress: openImageLibrary }],
-      );
-    }
-  };
+   const captureWithSystemCamera = async () => {
+     try {
+       if (Platform.OS === 'web') {
+         // On web, we don't have access to the system camera, so we open the image library directly.
+         openImageLibrary();
+         return;
+       }
+       const { status } = await ImagePicker.requestCameraPermissionsAsync();
+       if (status !== 'granted' && status !== undefined) {
+         Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền sử dụng Camera để chụp ảnh lá cây.');
+         return;
+       }
+       const result = await ImagePicker.launchCameraAsync({
+         mediaTypes: ['images'],
+         allowsEditing: true,
+         quality: CAMERA_QUALITY,
+         base64: true,
+       });
+       if (!result.canceled && result.assets && result.assets.length > 0) {
+         const asset = result.assets[0];
+         setCaptured({
+           uri: asset.uri,
+           base64: asset.base64,
+           crop: 'Mẫu lá chụp trực tiếp',
+           time: 'Vừa chụp xong',
+         });
+         setShowPreview(true);
+       }
+     } catch (err) {
+       Alert.alert(
+         'Không thể mở máy ảnh',
+         'Vui lòng thử lại hoặc chọn ảnh từ thư viện.',
+         [{ text: 'OK', onPress: openImageLibrary }],
+       );
+     }
+   };
 
-  const openImageLibrary = async () => {
-    try {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted' && status !== undefined) {
-        Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền truy cập Thư viện ảnh để chọn ảnh lá cây.');
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        quality: CAMERA_QUALITY,
-        base64: true,
-      });
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        const asset = result.assets[0];
-        setCaptured({
-          uri: asset.uri,
-          base64: asset.base64,
-          crop: 'Ảnh chọn từ thư viện',
-          time: 'Vừa chọn xong',
-        });
-        setShowPreview(true);
-      }
-    } catch (err) {
-      Alert.alert('Không thể mở Thư viện ảnh', 'Vui lòng thử lại.');
-    }
-  };
+   const openImageLibrary = async () => {
+     try {
+       // Request media library permission only on native platforms
+       if (Platform.OS !== 'web') {
+         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+         if (status !== 'granted' && status !== undefined) {
+           Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền truy cập Thư viện ảnh để chọn ảnh lá cây.');
+           return;
+         }
+       }
+       const result = await ImagePicker.launchImageLibraryAsync({
+         mediaTypes: ['images'],
+         allowsEditing: true,
+         quality: CAMERA_QUALITY,
+         base64: true,
+       });
+       if (!result.canceled && result.assets && result.assets.length > 0) {
+         const asset = result.assets[0];
+         setCaptured({
+           uri: asset.uri,
+           base64: asset.base64,
+           crop: 'Ảnh chọn từ thư viện',
+           time: 'Vừa chọn xong',
+         });
+         setShowPreview(true);
+       }
+     } catch (err) {
+       Alert.alert('Không thể mở Thư viện ảnh', 'Vui lòng thử lại.');
+     }
+   };
 
   const takePhoto = () => {
     if (mode === 'multi') {

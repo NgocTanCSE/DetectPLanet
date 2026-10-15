@@ -18,9 +18,6 @@ CHAT_MAX_TOKENS = 1024
 [ai]
 binding = "AI"
 
-[triggers]
-crons = ["*/5 * * * *"]
-
 # ── Staging environment ─────────────────────────────────────────────────
 [env.staging]
 name = "agriscan-ai-staging"

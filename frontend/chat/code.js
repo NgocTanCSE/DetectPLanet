@@ -221,6 +221,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    ...(Platform.OS === 'web'
+      ? {
+          cursor: 'pointer',
+          WebkitUserSelect: 'none',
+          userSelect: 'none',
+        }
+      : {}),
   },
   sendBtnDisabled: {
     opacity: 0.4,

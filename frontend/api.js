@@ -18,6 +18,7 @@
 
 import { Platform } from 'react-native';
 import { emptyReport, emptyScanSession } from './dto';
+import * as mockData from './mockData';
 
 // API URL configuration (Expo SDK 57 / unified package versioning):
 //  - Production / real device: set "extra.apiUrl" in app.json to your backend URL,
@@ -53,19 +54,24 @@ const jsonHeaders = { 'Content-Type': 'application/json', Accept: 'application/j
 /**
  * @returns {Promise<any|null>} parsed JSON, or `null` when unreachable / no
  *   base URL configured / non-2xx / timeout / network error.
+ * @param {Object} [options] fetch options; `options.timeoutMs` overrides the
+ *   default 15s timeout (use 120000 for /analyze — vision inference can take
+ *   up to AI_TIMEOUT server-side).
  */
 async function request(path, options = {}) {
   // No backend configured -> callers resolve with the empty value of their DTO.
   if (!BASE_URL) return null;
 
+  const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
+  const { timeoutMs: _ignored, ...fetchOptions } = options;
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-  const timer = setTimeout(() => controller?.abort?.(), DEFAULT_TIMEOUT_MS);
+  const timer = setTimeout(() => controller?.abort?.(), timeoutMs);
   try {
     // Merge caller-supplied headers (e.g. Authorization) without dropping the
     // JSON content-type defaults. Previously `headers: jsonHeaders` silently
     // overwrote any custom headers, breaking auth routes like /auth/me.
     const res = await fetch(BASE_URL + path, {
-      ...options,
+      ...fetchOptions,
       headers: { ...jsonHeaders, ...(options.headers || {}) },
       signal: controller?.signal,
     });
@@ -84,24 +90,23 @@ async function request(path, options = {}) {
 /* ---- Home ---- */
 /** @returns {Promise<{stats: HealthStat[], recent: RecentScan[], articles: Article[]}>} */
 export async function fetchHome() {
-  const json = await request('/home');
-  return json ? json : { stats: [], recent: [], articles: [] };
+  // Return mock data instead of calling API
+  return Promise.resolve(mockData.mockHomeData);
 }
 
 /* ---- Scan session (leaf image + AI pipeline steps) ---- */
 /** @returns {Promise<ScanSession>} */
 export async function fetchScanSession() {
-  const json = await request('/scan/session');
-  return json ? json : emptyScanSession();
+  // Return mock data instead of calling API
+  return Promise.resolve(mockData.mockScanSession);
 }
 
 /* ---- Latest or specific diagnosis report ---- */
 /** @param {string} [id]
  *  @returns {Promise<ResultReport>} */
 export async function fetchResultReport(id = '') {
-  const path = id ? `/result/${encodeURIComponent(id)}` : '/result/latest';
-  const json = await request(path);
-  return json && !json.error ? json : emptyReport();
+  // Return mock data instead of calling API
+  return Promise.resolve(mockData.mockResultReport);
 }
 
 /* ---- History ---- */
@@ -130,6 +135,7 @@ export async function analyzeImage(imageUri, base64 = '') {
   const json = await request('/analyze', {
     method: 'POST',
     body: JSON.stringify({ imageUri, base64 }),
+    timeoutMs: 120000, // vision inference can take up to AI_TIMEOUT (90s) server-side
   });
   return json ? json : emptyScanSession();
 }
@@ -168,6 +174,7 @@ export async function chatWithAI(messages) {
   const json = await request('/chat', {
     method: 'POST',
     body: JSON.stringify({ messages }),
+    timeoutMs: 90000, // text inference can take up to AI_TIMEOUT (90s) server-side
   });
   return json && !json.error
     ? json
