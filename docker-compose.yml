@@ -1,12 +1,12 @@
 # ─────────────────────────────────────────────────────────────────────────
 # AgriScan AI — Unified Docker Compose (ALL services in ONE file)
 #
-# Services: PostgreSQL + PHP API
+# Services: PostgreSQL + PHP API (both start by default)
 # AI inference: Cloudflare Workers AI (@cf/meta/llama-3.2-11b-vision-instruct)
 #
 # ── Single command to bring the entire system up: ──
-#     docker compose --profile full up --build -d   # full stack (with PostgreSQL)
-#     docker compose up --build -d                   # serverless MVP (no DB)
+#     docker compose up --build -d                   # full stack (with PostgreSQL)
+#     docker compose up --build -d --scale postgres=0  # serverless MVP (no DB)
 # ── Useful commands ──
 #     docker compose logs -f     # follow all logs
 #     docker compose down -v     # stop + destroy volumes (clean reset)
@@ -18,9 +18,9 @@
 #     npx wrangler deploy --env production
 # ─────────────────────────────────────────────────────────────────────────
 services:
-  # ── PostgreSQL Database (only started in "full" profile) ─────────────
+  # ── PostgreSQL Database (started by default with `docker compose up`) ──
+  # To skip the DB (serverless MVP mode): docker compose up --scale postgres=0
   postgres:
-    profiles: ["full"]
     image: postgres:16-alpine
     container_name: agriscan-postgres
     restart: unless-stopped
@@ -66,6 +66,12 @@ services:
       # Cloudflare Workers AI endpoint (replaces old local AI model)
       AI_ENDPOINT: ${AI_ENDPOINT:-https://agriscan-ai.workers.dev/predict}
       CHAT_ENDPOINT: ${CHAT_ENDPOINT:-https://agriscan-ai.workers.dev/chat}
+      # Demo fallback: when the AI worker isn't deployed, /analyze & /chat return
+      # sample results (flagged is_mock:true in the JSON) so the app is usable
+      # end-to-end on a phone. Deploy the worker in workers/ai-worker for REAL AI
+      # (the mock is skipped automatically once aiRequest succeeds). Set to 0 to
+      # disable the mock and get a strict 503 when the AI backend is down.
+      AGRISCAN_DEMO: ${AGRISCAN_DEMO:-1}
       AI_BEARER: ${CLOUDFLARE_API_TOKEN}
       AI_TIMEOUT: ${AI_TIMEOUT:-60}
       # Google OAuth

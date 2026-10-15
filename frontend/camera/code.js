@@ -1,11 +1,19 @@
 /**
  * CameraScreen — AgriScan AI Camera Viewfinder
  *
- * Clean, unobstructed viewfinder optimized for botanical field capture.
- * Eliminates artificial laser sweeps and hologram overlays.
- * Forest green accent, the original nature-inspired palette.
+ * Live preview via expo-camera `CameraView` (native + web secure-context),
+ * replacing the old placeholder that only launched the system camera app.
+ *
+ * Robust fallbacks:
+ *  - Web over a non-secure context (http://<LAN>:8081 on a phone) blocks the
+ *    camera, so we fall back to the photo library (still lets users pick an
+ *    image and run the analysis).
+ *  - If the camera permission is denied, we prompt and otherwise fall back to
+ *    the photo library so the capture button always does *something*.
+ *  - If the live preview errors out (onMountError), we gracefully degrade to
+ *    the placeholder + system fallback.
  */
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -15,8 +23,10 @@ import {
   Share,
   StyleSheet,
   Alert,
+  Platform,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { CameraView, useCameraPermissions, CameraType, FlashMode } from 'expo-camera';
 import { colors, typography, spacing, shadowCard, shadowPaper } from '../theme';
 import Icon from '../icons';
 import AppHeader from '../AppHeader';
@@ -27,18 +37,64 @@ const modes = [
   { key: 'multi', label: 'Chọn từ thư viện' },
 ];
 
+const CAMERA_QUALITY = 0.8;
+
 const CameraScreen = ({ navigation }) => {
   const [mode, setMode] = useState('single');
   const [flashOn, setFlashOn] = useState(false);
   const [gridVisible, setGridVisible] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
-  const [facing, setFacing] = useState('back');
+  const [facing, setFacing] = useState(CameraType.back);
   const [captured, setCaptured] = useState(emptyCapture());
+  const [cameraReady, setCameraReady] = useState(false);
+  const [cameraError, setCameraError] = useState(false);
+
+  const cameraRef = useRef(null);
+  const [permission, requestPermission] = useCameraPermissions();
+
+  const granted = permission?.status === 'granted';
+  // Show the live feed only when permission is granted and the preview has
+  // actually mounted without error.
+  const canStream = granted && !cameraError;
 
   const onBack = () => navigation?.navigate?.('home');
 
-  const takePhoto = async () => {
+  // Capture from the live CameraView (native + secure web context).
+  const captureFromLiveCamera = async () => {
+    if (!cameraRef.current || !cameraReady) return;
     try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: CAMERA_QUALITY,
+        base64: true,
+        skipProcessing: false,
+      });
+      setCaptured({
+        uri: photo.uri,
+        base64: photo.base64,
+        crop: 'Mẫu lá chụp trực tiếp',
+        time: 'Vừa chụp xong',
+      });
+      setShowPreview(true);
+    } catch (err) {
+      Alert.alert(
+        'Lỗi máy ảnh',
+        'Không thể chụp ảnh lúc này. Vui lòng chọn ảnh từ thư viện.',
+        [{ text: 'OK', onPress: openImageLibrary }],
+      );
+    }
+  };
+
+  // System fallback (web cannot use launchCameraAsync at all; native uses it).
+  const captureWithSystemCamera = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        Alert.alert(
+          'Máy ảnh trên web',
+          'Chụp trực tiếp không khả dụng trên trình duyệt web. Vui lòng chọn ảnh từ thư viện.',
+          [{ text: 'OK', onPress: openImageLibrary }],
+        );
+        return;
+      }
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted' && status !== undefined) {
         Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền sử dụng Camera để chụp ảnh lá cây.');
@@ -47,7 +103,7 @@ const CameraScreen = ({ navigation }) => {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.85,
+        quality: CAMERA_QUALITY,
         base64: true,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -61,7 +117,11 @@ const CameraScreen = ({ navigation }) => {
         setShowPreview(true);
       }
     } catch (err) {
-      console.warn('Không thể mở Camera:', err);
+      Alert.alert(
+        'Không thể mở máy ảnh',
+        'Vui lòng thử lại hoặc chọn ảnh từ thư viện.',
+        [{ text: 'OK', onPress: openImageLibrary }],
+      );
     }
   };
 
@@ -75,7 +135,7 @@ const CameraScreen = ({ navigation }) => {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         allowsEditing: true,
-        quality: 0.85,
+        quality: CAMERA_QUALITY,
         base64: true,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -89,20 +149,29 @@ const CameraScreen = ({ navigation }) => {
         setShowPreview(true);
       }
     } catch (err) {
-      console.warn('Không thể mở Thư viện:', err);
+      Alert.alert('Không thể mở Thư viện ảnh', 'Vui lòng thử lại.');
+    }
+  };
+
+  const takePhoto = () => {
+    if (mode === 'multi') {
+      openImageLibrary();
+      return;
+    }
+    if (canStream && cameraReady && cameraRef.current) {
+      captureFromLiveCamera();
+    } else {
+      captureWithSystemCamera();
     }
   };
 
   const onShutter = () => {
-    if (mode === 'multi') {
-      openImageLibrary();
-    } else {
-      takePhoto();
-    }
+    takePhoto();
   };
 
   const onAnalyze = () => {
     setShowPreview(false);
+    setCameraReady(false);
     navigation?.navigate?.('scan', {
       imageUri: captured.uri,
       base64: captured.base64,
@@ -111,7 +180,11 @@ const CameraScreen = ({ navigation }) => {
 
   const onRetake = () => {
     setShowPreview(false);
-    takePhoto();
+    if (canStream && cameraReady && cameraRef.current) {
+      captureFromLiveCamera();
+    } else {
+      captureWithSystemCamera();
+    }
   };
 
   const shareCamera = async () => {
@@ -120,6 +193,52 @@ const CameraScreen = ({ navigation }) => {
     } catch {
       /* no-op */
     }
+  };
+
+  // ── Feed area content (live preview / placeholder / captured image) ──
+  const renderFeed = () => {
+    if (captured.uri) {
+      return (
+        <Image
+          source={{ uri: captured.uri }}
+          style={[styles.feed, facing === CameraType.front ? { transform: [{ scaleX: -1 }] } : null]}
+          resizeMode="cover"
+        />
+      );
+    }
+    if (canStream) {
+      return (
+        <CameraView
+          ref={cameraRef}
+          style={styles.feed}
+          facing={facing}
+          flash={flashOn ? FlashMode.on : FlashMode.off}
+          onCameraReady={() => setCameraReady(true)}
+          onMountError={() => {
+            setCameraError(true);
+            setCameraReady(false);
+          }}
+        />
+      );
+    }
+    return (
+      <View style={[styles.feed, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors['surface-container-low'] }]}>
+        {granted === false ? (
+          <TouchableOpacity
+            onPress={requestPermission}
+            style={{ paddingHorizontal: 20, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 14 }}>
+            <Text style={{ color: colors['on-primary'], fontWeight: '700' }}>Cấp quyền máy ảnh</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            <Icon name="photo_camera" size={36} color={colors.muted} />
+            <Text style={[typography['label-sm'], { color: colors.muted, marginTop: 8 }]}>
+              {cameraError ? 'Máy ảnh không khả dụng, hãy chọn ảnh từ thư viện' : 'Sẵn sàng chụp mẫu lá'}
+            </Text>
+          </>
+        )}
+      </View>
+    );
   };
 
   return (
@@ -185,14 +304,7 @@ const CameraScreen = ({ navigation }) => {
 
         {/* Precision Viewfinder */}
         <View style={styles.viewport}>
-          {captured.uri ? (
-            <Image source={{ uri: captured.uri }} style={[styles.feed, facing === 'front' ? { transform: [{ scaleX: -1 }] } : null]} resizeMode="cover" />
-          ) : (
-            <View style={[styles.feed, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors['surface-container-low'] }]}>
-              <Icon name="photo_camera" size={36} color={colors.muted} />
-              <Text style={[typography['label-sm'], { color: colors.muted, marginTop: 8 }]}>Sẵn sàng chụp mẫu lá</Text>
-            </View>
-          )}
+          {renderFeed()}
 
           {/* Rule-of-thirds grid */}
           {gridVisible ? (
@@ -235,7 +347,7 @@ const CameraScreen = ({ navigation }) => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity accessibilityLabel="Lật camera" activeOpacity={0.8} onPress={() => setFacing((f) => (f === 'back' ? 'front' : 'back'))} style={styles.sideControlBtn}>
+          <TouchableOpacity accessibilityLabel="Lật camera" activeOpacity={0.8} onPress={() => setFacing((f) => (f === CameraType.back ? CameraType.front : CameraType.back))} style={styles.sideControlBtn}>
             <Icon name="flip_camera_ios" size={22} color={colors['on-surface']} />
             <Text style={[typography['label-sm'], { color: colors.muted, marginTop: 4 }]}>Đổi chiều</Text>
           </TouchableOpacity>
@@ -368,7 +480,7 @@ const styles = StyleSheet.create({
   viewportBottomPill: {
     position: 'absolute',
     bottom: 14,
-    backgroundColor: colors['surface'],
+    backgroundColor: colors.surface,
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 16,

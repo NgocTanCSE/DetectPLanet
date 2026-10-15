@@ -12,14 +12,14 @@ npm install
 npx wrangler deploy --env production
 
 # 2. Start the Docker stack
-docker compose --profile full up --build -d
+docker compose up --build -d
 ```
 
 ### Serverless MVP (no database)
 ```bash
 # PHP API runs in mock mode (returns static data for GET routes)
 # while still calling real Cloudflare Workers AI for /analyze and /chat
-docker compose up --build -d
+docker compose up --build -d --scale postgres=0
 ```
 
 > **Serverless mode**: When PostgreSQL không chạy, PHP API tự động chuyển sang **mock mode** — trả về dữ liệu mẫu cho các route GET (`home`, `history`, `guides`, `scan/session`, `result/latest`, `auth/me`), đồng thời vẫn gọi thực sự tới Cloudflare Workers AI cho `analyze` và `chat`. Google OAuth vẫn thực hiện token verification với Google, nhưng không ghi vào database.
@@ -94,7 +94,7 @@ cd workers/ai-worker && npx wrangler deploy --env production
 ## Useful Commands
 
 ```bash
-docker compose --profile full up --build -d   # Start full stack
+docker compose up --build -d   # Start full stack (with PostgreSQL)
 docker compose down -v                         # Stop + clean volumes
 docker compose logs -f                         # Follow all logs
 docker compose ps                              # Show status

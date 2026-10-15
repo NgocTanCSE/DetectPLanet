@@ -18,30 +18,28 @@
 // The vision model is a general-purpose image classifier, not plant-disease-specific,
 // so we prompt-engineer it to produce structured plant disease output.
 
-const PREDICT_PROMPT = `Bạn là chuyên gia bác học thực vật vật. Phân tích hình ảnh lá cây bên dưới.
+const PREDICT_PROMPT = `Bạn là chuyên gia bác học thực vật. Phân tích hình ảnh lá cây bên dưới.
+
+Trước tiên nhận diện loài cây (crop), sau đó chẩn đoán bệnh và đưa ra lời khuyên điều trị.
 
 Trả về KẾT QUẢ TRONG ĐỊNH DẠNG JSON SAU ĐÂY, không được thêm bất kỳ giải thích nào khác:
 
 {
-  "crop": "tên cây (ví dụ: rice, tomato, corn...)",
-  "crop_label": "tên cây bằng tiếng Việt (ví dụ: Lúa nước, Cà chua)",
-  "disease": "tên bệnh bằng tiếng Anh (ví dụ: Brown Spot, Leaf Blast, Early Blight...)",
-  "disease_label": "tên bệnh bằng tiếng Việt (ví dụ: Bệnh Đốm Nâu, Bệnh Đốm Lá, Bệnh Vàng Lá...) — nếu lá khỏe thì để 'Không có bệnh'",
-  "pathogen": "gây ra bởi (ví dụ: Bipolaris oryzae, Fusarium, Magnaporthe oryzae — để trống nếu không xác định được)",
+  "crop": "tên khoa học của cây (ví dụ: rice, tomato, corn, bean, cassava, cotton, soybean...)",
+  "crop_label": "tên cây bằng tiếng Việt (ví dụ: Lúa nước, Cà chua, Đậu đũa...)",
+  "disease": "tên bệnh bằng tiếng Anh (ví dụ: Brown Spot, Leaf Blast, Early Blight, Leaf Rust...) — nếu lá khỏe thì để 'None'",
+  "disease_label": "tên bệnh bằng tiếng Việt (ví dụ: Bệnh Đốm Nâu, Bệnh Vàng Lá, Bệnh Rùa...) — nếu lá khỏe thì để 'Không có bệnh'",
+  "pathogen": "gây ra bởi (ví dụ: Bipolaris oryzae, Fusarium, Magnaporthe oryzae, Colletotrichum — để trống nếu không xác định được)",
   "severity": "healthy | warning | danger",
   "confidence": số thực từ 0 đến 100 (độ tin cậy dự đoán),
-  "recommendation": "lời khuyên chăm sóc bằng tiếng Việt (phun trừ, bón phân, tưới nước, cắt lá bệnh...)",
+  "recommendation": "lời khuyên chăm sóc bằng tiếng Việt (phun thuốc, bón phân, tưới nước, cắt lá bệnh, đất, ánh sáng...)",
   "topk": [
     {"label": "tên bệnh", "display_label": "tên hiển thị", "score": số},
     {"label": "tên bệnh 2", "display_label": "tên hiển thị 2", "score": số}
   ]
 }
 
-Các bệnh đã biết (dùng để phân loại chính xác):
-- Pepper: Bacterial spot, healthy
-- Potato: Early blight, Late blight, healthy
-- Tomato: Bacterial spot, Early blight, Late blight, Leaf Mold, Septoria leaf spot, Spider mites, Target Spot, YellowLeaf Curl Virus, Mosaic virus, healthy
-- Rice: Brown spot, Leaf smut, healthy
+Hỗ trợ nhận diện mọi loài cây: lúa, cà chua, đậu, khoai tây, bắp, ngô, cây công, cây băm, trà, cà phê, chuối, xoài, dưa chuột, dâu, dưa hấu, và các cây trồng khác.
 
 Nếu lá khỏe mạnh (healthy): confidence = 100, severity = "healthy", disease = "None", recommendation = "Cây khỏe, không cần điều trị.".json`;
 

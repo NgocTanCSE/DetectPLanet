@@ -6,25 +6,36 @@
  * value* of its DTO when no backend is reachable, so the UI degrades to honest
  * empty states instead of crashing on a missing/unconfigured backend.
  *
- * To point the app at your backend, set BASE_URL below. Your server:
- *   const BASE_URL = 'https://103.139.203.43:887';
- * If the API routes live under a sub-path (e.g. /api or /index.php), append it
- * here. Keep empty ('') for local UI work — the render-test guard short-circuits
- * the moment BASE_URL is empty, so `node _validate.js` stays green until you
- * set your URL. (or read it from a build-time config / `expo-constants` extra).
+ * Base URL resolution (see the config block below):
+ *   1. `expo.extra.apiUrl` in app.json  -> production / real device / LAN dev.
+ *   2. Dev fallback `http://<host>:887` (Android emulator 10.0.2.2 / localhost).
+ *
+ * IMPORTANT: the PHP API is served at the ROOT of port 887 — there is NO
+ * `/detectplanet_api` (or `/api`) path prefix. Appending one 404s every call.
+ * On a *physical phone* neither localhost nor 10.0.2.2 is reachable, so set
+ * `extra.apiUrl` to your dev machine's LAN IP (e.g. http://192.168.1.42:887).
  */
 
 import { Platform } from 'react-native';
 import { emptyReport, emptyScanSession } from './dto';
 
-// API URL configuration:
-//  - Dev: http://10.0.2.2:887/detectplanet_api (Android emulator → host localhost)
-//    or http://localhost:887/detectplanet_api (iOS simulator / web)
-//  - Production: set "extra.apiUrl" in app.json + install expo-constants.
-//    The try/catch below picks that up automatically when the package is present.
-//    (Port 887 is the PHP/Apache web server — NOT 5432 which is PostgreSQL.)
+// API URL configuration (Expo SDK 57 / unified package versioning):
+//  - Production / real device: set "extra.apiUrl" in app.json to your backend URL,
+//    e.g. http://<dev-machine-LAN-IP>:887  (find it with `hostname -I` on Linux).
+//    The try/catch below picks it up automatically via expo-constants.
+//  - Dev fallback (used only when extra.apiUrl is empty):
+//        http://10.0.2.2:887    -> Android *emulator* (-> host localhost)
+//        http://localhost:887   -> iOS simulator / web on the host machine.
+//    NOTE: 10.0.2.2 and localhost are NOT reachable from a *physical* phone — set
+//    extra.apiUrl to your LAN IP for on-device testing.
+//  - The PHP API is served at the ROOT of port 887: the Docker doc-root is
+//    /var/www/html (index.php + .htaccess route every non-static path to the
+//    router), so NO path prefix is used. The old "/detectplanet_api" prefix was
+//    inherited from the project's original name and 404s against this router
+//    (`GET /detectplanet_api/home` -> 404, `GET /home` -> 200). Do NOT re-add it.
+//  - Port 887 is the PHP/Apache web server, NOT 5432 (PostgreSQL).
 const _DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-const _DEV_URL  = `http://${_DEV_HOST}:887/detectplanet_api`;
+const _DEV_URL  = `http://${_DEV_HOST}:887`;
 
 let BASE_URL = _DEV_URL;
 try {
@@ -50,9 +61,12 @@ async function request(path, options = {}) {
   const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = setTimeout(() => controller?.abort?.(), DEFAULT_TIMEOUT_MS);
   try {
+    // Merge caller-supplied headers (e.g. Authorization) without dropping the
+    // JSON content-type defaults. Previously `headers: jsonHeaders` silently
+    // overwrote any custom headers, breaking auth routes like /auth/me.
     const res = await fetch(BASE_URL + path, {
       ...options,
-      headers: jsonHeaders,
+      headers: { ...jsonHeaders, ...(options.headers || {}) },
       signal: controller?.signal,
     });
     const data = await res.json().catch(() => null);

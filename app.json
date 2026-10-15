@@ -33,6 +33,7 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "expo-camera",
       [
         "expo-image-picker",
         {
@@ -53,7 +54,7 @@
       ]
     ],
     "extra": {
-      "apiUrl": "",
+      "apiUrl": "http://192.168.2.188:887",
       "googleClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
       "imagePickerQuality": 0.8,
       "imagePickerBase64": true

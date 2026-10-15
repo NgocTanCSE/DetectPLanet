@@ -196,8 +196,10 @@ function getApiBase() {
   } catch {
     /* fallback below */
   }
+  // The PHP API is served at the root of port 887 (no /detectplanet_api prefix);
+  // extra.apiUrl (set in app.json) overrides this for production / real devices.
   const host = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-  return `http://${host}:887/detectplanet_api`;
+  return `http://${host}:887`;
 }
 
 export default {

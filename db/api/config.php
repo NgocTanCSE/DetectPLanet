@@ -18,12 +18,16 @@ $DB = [
     'name'    => getenv('DB_NAME') ?: 'agriscan',
     'user'    => getenv('DB_USER') ?: 'postgres',
     'pass'    => getenv('DB_PASS') ?: 'postgres',
+    'sslmode' => getenv('DB_SSLMODE') ?: '',
     'charset' => 'utf8',
 ];
 
 if ($DB['driver'] === 'pgsql') {
     $dsn = sprintf('pgsql:host=%s;port=%s;dbname=%s',
         $DB['host'], $DB['port'], $DB['name']);
+    if (!empty($DB['sslmode'])) {
+        $dsn .= ';sslmode=' . $DB['sslmode'];
+    }
 } else {
     $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s',
         $DB['host'], $DB['port'], $DB['name'], $DB['charset'] ?? 'utf8mb4');

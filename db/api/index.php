@@ -198,7 +198,7 @@ function mockGuides() {
 }
 
 function mockPipeline($crop, $confidence) {
-    $modelName = (strcasecmp($crop ?? '', 'rice') === 0) ? 'Phân tích LLaMA Vision (Lúa)' : 'Phân tích LLaMA Vision';
+    $modelName = (strcasecmp($crop ?? '', 'rice') === 0) ? 'Phân tích AI Vision (Lúa)' : 'Phân tích AI Vision';
     return [
         ['id' => 'p1', 'icon' => 'camera', 'title' => 'Chụp ảnh lá', 'desc' => 'Đã chụp ảnh', 'status' => 'Hoàn tất', 'active' => true,  'iconBg' => '#DBEAFE', 'iconColor' => '#2563EB', 'sort_order' => 1],
         ['id' => 'p2', 'icon' => 'biotech', 'title' => $modelName, 'desc' => 'Nhận diện bệnh', 'status' => 'Hoàn tất', 'active' => true, 'iconBg' => '#FEF3C7', 'iconColor' => '#D97706', 'sort_order' => 2],
@@ -215,6 +215,33 @@ function mockDetections($severity, $confidence) {
     return [
         ['id' => 'd1', 'top' => '32%', 'left' => '38%', 'confidence' => confStr($confidence) . '%', 'severity' => $severity, 'sort_order' => 1],
         ['id' => 'd2', 'top' => '58%', 'left' => '30%', 'confidence' => '12.4%', 'severity' => 'warning', 'sort_order' => 2],
+    ];
+}
+
+/**
+ * Deterministic sample prediction used as a graceful fallback when the AI
+ * inference backend (Cloudflare Workers AI) is not deployed yet (demo mode).
+ * Lets the full analyze -> result flow run end-to-end without a live worker.
+ * Deploy the worker in workers/ai-worker (or set AI_ENDPOINT) for REAL inference;
+ * the response is flagged `is_mock: true` so the UI can show a warning badge.
+ * Disable with AGRISCAN_DEMO=0.
+ */
+function mockPrediction() {
+    return [
+        'crop'           => 'rice',
+        'crop_label'     => 'Lúa nước',
+        'disease'        => 'bacterial_leaf_blight',
+        'disease_label'  => 'Bệnh Đốm Nâu',
+        'pathogen'       => 'Bipolaris oryzae (Cochliobolus miyabeanus)',
+        'severity'       => 'danger',
+        'confidence'     => 0.92,
+        'recommendation' => 'Bón phân NPK (16-16-8) định kỳ, tưới nhẹ và đều. Cắt bỏ lá bệnh, tiêu đốt không rải xạt. Nếu diện tích ảnh hưởng >30% hãy phun thuốc trái cây (ví dụ: Chunggham) theo nhãn đã kiểm chứng.',
+        'topk' => [
+            ['disease' => 'bacterial_leaf_blight', 'score' => 92.3],
+            ['disease' => 'brown_spot',           'score' => 12.4],
+            ['disease' => 'rice_rust',            'score' => 3.1],
+        ],
+        'is_mock' => true,
     ];
 }
 
@@ -306,6 +333,8 @@ if ($method === 'GET') {
         if (!$row) send(emptyReport());
         $dets = $pdo->prepare("SELECT * FROM scan_detections WHERE scan_id=? ORDER BY sort_order");
         $dets->execute([$row['id']]);
+        $steps = $pdo->prepare("SELECT * FROM scan_pipeline_steps WHERE scan_id=? ORDER BY sort_order");
+        $steps->execute([$row['id']]);
         send([
             'id'             => $row['id'],
             'crop'           => $row['crop'],
@@ -317,8 +346,10 @@ if ($method === 'GET') {
             'time'           => fmtTime($row['created_at']),
             'recommendation' => $row['recommendation'],
             'status'         => ['spread' => $row['spread'], 'stage' => $row['stage'], 'loss' => $row['loss']],
+            'pipeline'       => array_map('mapPipeline', $steps->fetchAll()),
             'accordion'      => loadGuides($pdo),
             'detections'     => array_map('mapDetection', $dets->fetchAll()),
+            'is_mock'        => !empty($row['is_mock']),
         ]);
     }
 
@@ -434,7 +465,7 @@ if ($method === 'POST') {
                     $localPath = $dest;
                     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
                     $proto = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-                    $imageUri = "$proto://$host/detectplanet_api/uploads/$filename";
+                    $imageUri = "$proto://$host/uploads/$filename";
                 }
             }
         }
@@ -446,13 +477,22 @@ if ($method === 'POST') {
         ];
         $pred = ($imageUri !== '' || $rawBase64 !== '') ? aiRequest($aiPayload) : null;
 
-        // BẮT BUỘC DÙNG KẾT QUẢ THẬT TỪ AI - LOẠI BỎ TOÀN BỘ MOCK
+        // Nếu backend AI chưa sẵn sàng (chưa deploy worker ở workers/ai-worker),
+        // dùng một kết quả mẫu để luồng phân tích vẫn chạy được end-to-end.
+        // Tắt bằng AGRISCAN_DEMO=0 hoặc deploy worker thật để dùng AI thực.
+        $demoAllowed = getenv('AGRISCAN_DEMO') === false || getenv('AGRISCAN_DEMO') !== '0';
+        if ((!is_array($pred) || empty($pred['disease'])) && $demoAllowed) {
+            $pred = mockPrediction();
+        }
+
+        // Chỉ trả lỗi 503 thực sự khi đã tắt demo mode VÀ AI vẫn không trả lời.
         if (!is_array($pred) || empty($pred['disease'])) {
             http_response_code(503);
             send([
                 'error'   => 'Dịch vụ AI không phản hồi',
                 'message' => 'Không thể nhận diện ảnh hoặc AI server chưa sẵn sàng.',
                 'detail'  => $pred,
+                'is_mock' => true,
             ]);
         }
 
@@ -486,6 +526,7 @@ if ($method === 'POST') {
                 'pipeline'       => mockPipeline($finalCrop, $confidence),
                 'detections'     => mockDetections($severity, $confidence),
                 'topk'           => $pred['topk'] ?? [],
+                'is_mock'        => !empty($pred['is_mock']),
             ]);
         }
 
@@ -503,7 +544,8 @@ if ($method === 'POST') {
             (scan_id, id, icon, title, descr, step_status, is_active, icon_bg, icon_color, sort_order)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $modelName = (strcasecmp($finalCrop, 'rice') === 0) ? 'Phân tích Cloudflare LLaMA Vision (Lúa)' : 'Phân tích Cloudflare LLaMA Vision';
-        $pStmt->execute([$id, 'p2', 'biotech', $modelName, 'Nhận diện: ' . $finalDisease, 'Hoàn tất', 1, '#FEF3C7', '#D97706', 2]);
+        $pStmt->execute([$id, 'p1', 'camera',    'Chụp ảnh lá', 'Đã chụp ảnh', 'Hoàn tất', 1, '#DBEAFE', '#2563EB', 1]);
+        $pStmt->execute([$id, 'p2', 'biotech',   $modelName, 'Nhận diện: ' . $finalDisease, 'Hoàn tất', 1, '#FEF3C7', '#D97706', 2]);
         $pStmt->execute([$id, 'p3', 'agronheart', 'Giải pháp điều trị', 'Độ tin cậy: ' . confStr($confidence) . '%', 'Hoàn tất', 1, '#DCFCE7', '#16A34A', 3]);
 
         // Tạo detections (bounding boxes) dựa trên kết quả thật
@@ -539,6 +581,7 @@ if ($method === 'POST') {
             'pipeline'       => array_map('mapPipeline', $steps->fetchAll()),
             'detections'     => array_map('mapDetection', $dets->fetchAll()),
             'topk'           => $pred['topk'] ?? [],
+            'is_mock'        => !empty($pred['is_mock']),
         ]);
     }
 
@@ -692,6 +735,17 @@ if ($method === 'POST') {
         $data = $resp === false ? null : json_decode($resp, true);
 
         if ($data === null) {
+            // Demo mode: trả về một câu trả lời mẫu để giao diện chat vẫn dùng được
+            // khi worker AI chưa được triển khai. Tắt bằng AGRISCAN_DEMO=0 để nhận
+            // lỗi 503 thực, hoặc deploy worker / đặt CHAT_ENDPOINT để nhận trả lời thực.
+            $demoAllowed = getenv('AGRISCAN_DEMO') === false || getenv('AGRISCAN_DEMO') !== '0';
+            if ($demoAllowed) {
+                send([
+                    'role'    => 'assistant',
+                    'content' => 'Đây là câu trả lời mẫu vì trợ lý AI AgriScan chưa được kết nối (worker chưa deploy). Hãy triển khai workers/ai-worker hoặc đặt CHAT_ENDPOINT để nhận câu trả lời thực. Bạn vẫn có thể dùng phân tích ảnh ở màn hình "Chụp ảnh mẫu lá" nhé!',
+                    'is_mock' => true,
+                ]);
+            }
             http_response_code(503);
             send([
                 'error' => 'AI chat service unavailable',

@@ -175,7 +175,17 @@ const imagePickerStub = {
   requestMediaLibraryPermissionsAsync: async () => ({ status: 'granted' }),
   launchCameraAsync: async () => ({ canceled: false, assets: [{ uri: 'https://agriscan.ai/samples/leaf_a841.jpg', base64: '' }] }),
   launchImageLibraryAsync: async () => ({ canceled: false, assets: [{ uri: 'https://agriscan.ai/samples/leaf_a841.jpg', base64: '' }] }),
-  MediaTypeOptions: { Images: 'Images' },
+  MediaTypeOptions: { Images: 'images', Videos: 'videos', LivePhotos: 'livePhotos' },
+};
+
+// Stub for expo-camera (CameraView live preview + permission hook).
+// The harness only checks that CameraScreen renders; it never presses the
+// shutter, so a no-op CameraView and a "granted" permission are sufficient.
+const expoCameraStub = {
+  CameraView: () => null,
+  useCameraPermissions: () => [{ status: 'granted' }, async () => ({ status: 'granted' })],
+  CameraType: { back: 'back', front: 'front' },
+  FlashMode: { off: 'off', on: 'on', auto: 'auto', screen: 'screen' },
 };
 
 const expoCryptoStub = {
@@ -208,6 +218,7 @@ Module._load = function (request, parent, isMain) {
   if (request === 'react') return reactStub;
   if (request === 'react-native') return rnStub;
   if (request === 'expo-image-picker') return imagePickerStub;
+  if (request === 'expo-camera') return expoCameraStub;
   if (request === 'expo-crypto') return expoCryptoStub;
   if (request === 'react-native-svg') return svgStub;
   if (request === 'react-native-safe-area-context') return safeAreaStub;

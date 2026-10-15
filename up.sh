@@ -3,14 +3,14 @@
 # AgriScan AI — Single-command full-stack Docker launcher
 #
 #   ./up.sh              # build + start everything (detached, WITH database)
-#   ./up.sh serverless   # build + start WITHOUT database (MVP: FE + API + AI)
+#   ./up.sh serverless   # build + start WITHOUT database (MVP: FE + API)
 #   ./up.sh -f           # follow logs after starting
 #   ./up.sh -f serverless
 #   ./up.sh build        # (re)build images only, don't start
 #
 # Brings up:
-#   Default:  PostgreSQL + PHP API + FastAPI AI + nginx (web frontend + proxy)
-#   Serverless (MVP):  PHP API + FastAPI AI + nginx (no DB — API uses mock data)
+#   Default:  PostgreSQL + PHP API (both start by default)
+#   Serverless (MVP):  PHP API only (postgres scaled to 0 — API uses mock data)
 # ─────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
@@ -48,15 +48,15 @@ for arg in "$@"; do
     esac
 done
 
-# ── 4. Select compose files ─────────────────────────────────────────
-COMPOSE_FILES="-f docker-compose.yml"
-PROFILE=""
-MODE_DESC="PostgreSQL + API + AI + Web"
+# ── 4. Select compose mode ──────────────────────────────────────────
+# Default: PostgreSQL + PHP API (both start together)
+# Serverless MVP: skip the DB by scaling postgres=0
+SCALE_POSTGRES=""
+MODE_DESC="PostgreSQL + API + Web"
 
 if [ "$SERVERLESS" = true ]; then
-    COMPOSE_FILES=""   # serverless: web + api + ai (no postgres)
-    PROFILE="--profile serverless"   # use compose profiles to exclude postgres
-    MODE_DESC="Web + API + AI (Serverless MVP — no database)"
+    SCALE_POSTGRES="--scale postgres=0"   # skip postgres container
+    MODE_DESC="Web + API (Serverless MVP — no database)"
 fi
 
 # ── 5. Build + start ────────────────────────────────────────────────
@@ -73,13 +73,13 @@ if [ "$BUILD_ONLY" = true ]; then
     exit 0
 fi
 
-# Serverless: only start web, api, ai (skip postgres)
+# Start services (serverless mode scales postgres=0 to skip the DB)
 if [ "$SERVERLESS" = true ]; then
-    log "🔨 Building and starting serverless stack (Web + API + AI, no DB)..."
-    docker compose up -d --build
+    log "🔨 Building and starting serverless stack (Web + API, no DB)..."
+    docker compose up -d --build $SCALE_POSTGRES
 else
     log "🔨 Building and starting all services ($MODE_DESC)..."
-    docker compose --profile full up -d --build
+    docker compose up -d --build
 fi
 
 # ── 5. Wait for services to be running ──────────────────────────────

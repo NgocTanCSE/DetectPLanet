@@ -212,10 +212,10 @@ for (const s of scans) {
   pipelineSteps.push({ scan_id: s.id, id: 'p1', icon: 'image_search', title: 'Tiếp nhận ảnh lá', descr: '', step_status: 'Hoàn tất', is_active: 1, icon_bg: s.iconBg, icon_color: s.iconColor, sort_order: 1 });
   // p2 — AI analysis
   if (isDone) {
-    pipelineSteps.push({ scan_id: s.id, id: 'p2', icon: 'biotech', title: 'Phân tích LLaMA Vision', descr: '', step_status: 'Hoàn tất', is_active: 0, icon_bg: '', icon_color: '', sort_order: 2 });
+    pipelineSteps.push({ scan_id: s.id, id: 'p2', icon: 'biotech', title: 'Phân tích AI Vision', descr: '', step_status: 'Hoàn tất', is_active: 0, icon_bg: '', icon_color: '', sort_order: 2 });
   } else {
     const pct = randRange(30, 92);
-    pipelineSteps.push({ scan_id: s.id, id: 'p2', icon: 'biotech', title: 'Phân tích LLaMA Vision', descr: '', step_status: 'Đang phân tích (' + pct + '%)', is_active: 1, icon_bg: '#eef2ff', icon_color: '#255bb5', sort_order: 2 });
+    pipelineSteps.push({ scan_id: s.id, id: 'p2', icon: 'biotech', title: 'Phân tích AI Vision', descr: '', step_status: 'Đang phân tích (' + pct + '%)', is_active: 1, icon_bg: '#eef2ff', icon_color: '#255bb5', sort_order: 2 });
   }
   // p3 — recommendation
   pipelineSteps.push({ scan_id: s.id, id: 'p3', icon: 'agronheart', title: 'Đề xuất phòng trừ', descr: '', step_status: isDone ? 'Hoàn tất' : '', is_active: 0, icon_bg: '', icon_color: '', sort_order: 3 });
