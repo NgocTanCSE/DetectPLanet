@@ -194,6 +194,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors['outline'],
     backgroundColor: colors.paper,
+    // Lift the composer above the floating BottomNav (zIndex 10). zIndex only
+    // takes effect on a positioned element, so set position:relative here.
+    position: 'relative',
+    zIndex: 11,
+    elevation: 2,
   },
   input: {
     flex: 1,

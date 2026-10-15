@@ -34,15 +34,21 @@ class ErrorBoundary extends Component {
   }
   render() {
     if (this.state.hasError) {
+      // NOTE: this fallback is rendered by ErrorBoundary, which sits OUTSIDE
+      // <SafeAreaProvider> in App.js. Do NOT use <SafeAreaView> here (it calls
+      // useSafeAreaInsets and would re-throw "No safe area value available",
+      // wiping the whole React tree on web). A plain <View> fallback keeps the
+      // boundary robust and guarantees we always see the *real* error instead
+      // of a masked secondary crash.
       return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' }}>
           <Text style={[typography.headline.sm, { color: colors['on-surface'] }]}>
             Đã xảy ra lỗi
           </Text>
           <Text style={[typography.body.sm, { color: colors.muted, marginTop: 8 }]}>
             Vui lòng khởi động lại ứng dụng.
           </Text>
-        </SafeAreaView>
+        </View>
       );
     }
     return this.props.children;
@@ -193,13 +199,19 @@ export default function App() {
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <StatusBar barStyle="dark-content" backgroundColor={colors.paper} />
           <ActiveScreen navigation={navigation} route={{ params }} />
-          <BottomNav
-            activeTab={SCREEN_TO_TAB[screen] || 'home'}
-            onTabPress={(tab) => {
-              setParams({});
-              setScreen(tab);
-            }}
-          />
+          {/* BottomNav is hidden on the full-screen task flows (camera / scan /
+              result) so it cannot overlap the camera shutter and the analysis
+              preview sheet's "Phân tích ngay" button (z-index stacking bug that
+              intercepted taps). It stays available on the tabbed routes. */}
+          {screen !== 'camera' && screen !== 'scan' && screen !== 'result' ? (
+            <BottomNav
+              activeTab={SCREEN_TO_TAB[screen] || 'home'}
+              onTabPress={(tab) => {
+                setParams({});
+                setScreen(tab);
+              }}
+            />
+          ) : null}
         </SafeAreaView>
       </SafeAreaProvider>
     </ErrorBoundary>

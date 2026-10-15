@@ -32,6 +32,15 @@ import Icon from '../icons';
 import AppHeader from '../AppHeader';
 import { emptyCapture } from '../dto';
 
+// expo-camera does NOT export `CameraType` / `FlashMode` on web
+// (build/Camera.types.js only re-exports `PermissionStatus`), so they are
+// `undefined` when the bundle resolves to the web entry. The web camera screen
+// never renders a live `<CameraView>` (it falls back to the photo library), but
+// these local fallbacks keep the module web-safe so `useState(CameraType.back)`
+// and friends never crash the whole tree on `Platform.OS === 'web'`.
+const Facing = CameraType && CameraType.back ? CameraType : { back: 'back', front: 'front' };
+const Flash = FlashMode && FlashMode.on ? FlashMode : { on: 'on', off: 'off' };
+
 const modes = [
   { key: 'single', label: 'Chụp trực tiếp' },
   { key: 'multi', label: 'Chọn từ thư viện' },
@@ -44,7 +53,7 @@ const CameraScreen = ({ navigation }) => {
   const [flashOn, setFlashOn] = useState(false);
   const [gridVisible, setGridVisible] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
-  const [facing, setFacing] = useState(CameraType.back);
+  const [facing, setFacing] = useState(Facing.back);
   const [captured, setCaptured] = useState(emptyCapture());
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState(false);
@@ -55,7 +64,12 @@ const CameraScreen = ({ navigation }) => {
   const granted = permission?.status === 'granted';
   // Show the live feed only when permission is granted and the preview has
   // actually mounted without error.
-  const canStream = granted && !cameraError;
+  // Show the live feed only when permission is granted, the preview has
+  // actually mounted without error, and we are on a native platform. On web we
+  // always fall back to the photo-library picker — expo-camera's live web
+  // preview requires a secure context + a device camera (unavailable in
+  // `expo start` http dev / headless CI), and `CameraType` is undefined there.
+  const canStream = granted && !cameraError && Platform.OS !== 'web';
 
   const onBack = () => navigation?.navigate?.('home');
 
@@ -201,7 +215,7 @@ const CameraScreen = ({ navigation }) => {
       return (
         <Image
           source={{ uri: captured.uri }}
-          style={[styles.feed, facing === CameraType.front ? { transform: [{ scaleX: -1 }] } : null]}
+          style={[styles.feed, facing === Facing.front ? { transform: [{ scaleX: -1 }] } : null]}
           resizeMode="cover"
         />
       );
@@ -212,7 +226,7 @@ const CameraScreen = ({ navigation }) => {
           ref={cameraRef}
           style={styles.feed}
           facing={facing}
-          flash={flashOn ? FlashMode.on : FlashMode.off}
+          flash={flashOn ? Flash.on : Flash.off}
           onCameraReady={() => setCameraReady(true)}
           onMountError={() => {
             setCameraError(true);
@@ -347,7 +361,7 @@ const CameraScreen = ({ navigation }) => {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity accessibilityLabel="Lật camera" activeOpacity={0.8} onPress={() => setFacing((f) => (f === CameraType.back ? CameraType.front : CameraType.back))} style={styles.sideControlBtn}>
+          <TouchableOpacity accessibilityLabel="Lật camera" activeOpacity={0.8} onPress={() => setFacing((f) => (f === Facing.back ? Facing.front : Facing.back))} style={styles.sideControlBtn}>
             <Icon name="flip_camera_ios" size={22} color={colors['on-surface']} />
             <Text style={[typography['label-sm'], { color: colors.muted, marginTop: 4 }]}>Đổi chiều</Text>
           </TouchableOpacity>
