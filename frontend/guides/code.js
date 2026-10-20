@@ -1,18 +1,20 @@
 /**
  * GuidesScreen — AgriScan AI Cẩm nang (disease guide accordion)
  *
- * Loads the real guides from GET /guides (database-backed) and renders them
- * as expandable accordion cards, matching the design language of the result
- * screen's "Phác đồ can thiệp" section.
+ * Text-only reference list. Loading state shows plain text "Đang tải...".
+ * Error state shows plain text. Accordion uses numbered indicators
+ * instead of icon circles. Expand/collapse uses a text caret (▼).
+ * Sections use bullet characters (•) instead of check_circle / eco icons.
  */
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
-import { colors, typography, spacing, shadowPaper } from '../theme';
-import Icon from '../icons';
-import AppHeader from '../AppHeader';
+import { colors, typography, spacing, shadowFlat } from '../theme';
+import AppHeader, { useTopInset, HEADER_HEIGHT } from '../AppHeader';
 import { fetchGuides } from '../api';
+import Icon from '../icons';
 
 const GuidesScreen = ({ navigation }) => {
+  const topInset = useTopInset();
   const [guides, setGuides] = useState([]);
   const [open, setOpen] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,7 +46,7 @@ const GuidesScreen = ({ navigation }) => {
       />
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 64,
+          paddingTop: topInset + HEADER_HEIGHT,
           paddingBottom: 96,
           paddingHorizontal: spacing.gutter,
           gap: 10,
@@ -58,15 +60,13 @@ const GuidesScreen = ({ navigation }) => {
         }>
         {loading ? (
           <View style={styles.emptyCard}>
-            <Icon name="menu_book" size={32} color={colors.muted} />
-            <Text style={[typography.body.md, { color: colors.muted, marginTop: 8 }]}>
-              Đang tải cẩm nang...
+            <Text style={[typography.body.sm, { color: colors.muted }]}>
+              Đang tải...
             </Text>
           </View>
         ) : error ? (
           <View style={styles.emptyCard}>
-            <Icon name="error_outline" size={32} color={colors.muted} />
-            <Text style={[typography.body.md, { color: colors.muted, marginTop: 8, textAlign: 'center' }]}>
+            <Text style={[typography.body.sm, { color: colors.muted, textAlign: 'center' }]}>
               {error}
             </Text>
           </View>
@@ -74,17 +74,23 @@ const GuidesScreen = ({ navigation }) => {
           guides.map((item) => {
             const isOpen = open === item.id;
             return (
-              <View key={item.id} style={[styles.accordionCard, shadowPaper]}>
+              <View key={item.id} style={[styles.accordionCard, shadowFlat]}>
                 <TouchableOpacity
                   activeOpacity={0.8}
                   onPress={() => setOpen(isOpen ? null : item.id)}
                   style={styles.accordionHeader}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <View style={styles.accordionIcon}>
-                      <Icon name={item.icon || 'eco'} size={18} color={colors.primary} />
+                    {/* Numbered indicator — no menu_book icon circle */}
+                    <View style={[styles.accordionIcon, { backgroundColor: isOpen ? colors['primary-subtle'] : colors['surface-container-low'] }]}>
+                      <Text style={[typography.body.sm, {
+                        color: isOpen ? colors.primary : colors.muted,
+                        fontWeight: '700',
+                      }]}>
+                        {guides.indexOf(item) + 1}
+                      </Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[typography['label-lg'], { color: colors['on-surface'], fontWeight: '600' }]} numberOfLines={1}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]} numberOfLines={1}>
                         {item.title}
                       </Text>
                       <Text style={[typography.body.sm, { color: colors.muted }]} numberOfLines={1}>
@@ -92,7 +98,9 @@ const GuidesScreen = ({ navigation }) => {
                       </Text>
                     </View>
                   </View>
-                  <Icon name="expand_more" size={20} color={colors.muted} style={{ transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }} />
+                  {/* Expand/collapse chevron icon */}
+                  <Icon name={isOpen ? 'expand_more' : 'chevron_right'} size={18} color={colors.muted}
+                    style={{ transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }} />
                 </TouchableOpacity>
 
                 {isOpen ? (
@@ -102,19 +110,22 @@ const GuidesScreen = ({ navigation }) => {
                         {s.title ? (
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                             {s.badge ? (
-                              <View style={[styles.sectionBadge, s.badgeBg ? { backgroundColor: s.badgeBg } : null]}>
-                                <Text style={[typography['label-sm'], { color: s.badgeText || colors.primary, fontWeight: '700' }]}>
+                              <View style={styles.sectionBadge}>
+                                <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '700' }]}>
                                   {s.badge}
                                 </Text>
                               </View>
                             ) : null}
-                            <Text style={[typography['label-md'], { color: colors['on-surface'], fontWeight: '600' }]}>
+                            <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]}>
                               {s.title}
                             </Text>
                           </View>
                         ) : null}
+                        {/* Bullet text instead of check_circle/eco icon */}
                         <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                          <Icon name={s.icon === 'check_circle' ? 'check_circle' : 'eco'} size={16} color={colors.primary} style={{ marginTop: 2 }} />
+                          <Text style={[typography.body.sm, { color: colors.primary, marginTop: 2 }]}>
+                            •
+                          </Text>
                           <Text style={[typography.body.md, { color: colors['on-surface-variant'], flex: 1, lineHeight: 20 }]}>
                             {s.body}
                           </Text>
@@ -135,10 +146,10 @@ const GuidesScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   accordionCard: {
     backgroundColor: colors.paper,
-    borderRadius: 14,
+    borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   accordionHeader: {
     flexDirection: 'row',
@@ -147,12 +158,13 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   accordionIcon: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: colors['primary-fixed'],
+    width: 26,
+    height: 26,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.outline,
   },
   accordionContent: {
     paddingHorizontal: 14,
@@ -162,9 +174,9 @@ const styles = StyleSheet.create({
   accordionSection: {
     backgroundColor: colors['surface-container-low'],
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   sectionBadge: {
     paddingHorizontal: 6,
@@ -175,13 +187,12 @@ const styles = StyleSheet.create({
   emptyCard: {
     alignItems: 'center',
     backgroundColor: colors.paper,
-    borderRadius: 14,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
     padding: 24,
     marginTop: 12,
   },
 });
 
 export default GuidesScreen;
-

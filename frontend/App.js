@@ -10,16 +10,20 @@
  * Original student-list App.js was replaced by the AgriScan design-system shell
  * per the HTML→JS conversion request.
  */
-import React, { useState, Component, useEffect } from 'react';
-import { StatusBar, View, Text } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, Component, useEffect } from "react";
+import { StatusBar, View, Text } from "react-native";
+import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { colors, typography } from "./theme";
+import BottomNav from "./BottomNav";
+import AppHeader from "./AppHeader";
+import { useFonts } from "./useFonts";
+import { verifySession, onAuthStateChanged } from "./auth";
+import LoginScreen from "./LoginScreen";
 
-import { colors, typography } from './theme';
-import BottomNav from './BottomNav';
-import AppHeader from './AppHeader';
-import { useFonts } from './useFonts';
-import { verifySession, onAuthStateChanged } from './auth';
-import LoginScreen from './LoginScreen';
+// Splash screen is handled natively via the SplashTheme (android
+// windowBackground drawable + delayed background clear in MainActivity.onCreate).
+// No JS splash-screen package is needed — this avoids the old Android Support
+// Library conflict that react-native-splash-screen v3 introduced.
 
 class ErrorBoundary extends Component {
   constructor(props) {
@@ -30,7 +34,7 @@ class ErrorBoundary extends Component {
     return { hasError: true };
   }
   componentDidCatch(error, info) {
-    console.error('App ErrorBoundary caught:', error, info);
+    console.error("App ErrorBoundary caught:", error, info);
   }
   render() {
     if (this.state.hasError) {
@@ -41,11 +45,22 @@ class ErrorBoundary extends Component {
       // boundary robust and guarantees we always see the *real* error instead
       // of a masked secondary crash.
       return (
-        <View style={{ flex: 1, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={[typography.headline.sm, { color: colors['on-surface'] }]}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: colors.paper,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Text
+            style={[typography.headline.sm, { color: colors["on-surface"] }]}
+          >
             Đã xảy ra lỗi
           </Text>
-          <Text style={[typography.body.sm, { color: colors.muted, marginTop: 8 }]}>
+          <Text
+            style={[typography.body.sm, { color: colors.muted, marginTop: 8 }]}
+          >
             Vui lòng khởi động lại ứng dụng.
           </Text>
         </View>
@@ -56,39 +71,40 @@ class ErrorBoundary extends Component {
 }
 
 // Converted screens (each is the RN port of its HTML `code.html`)
-import HomeScreen from './home/code';
-import CameraScreen from './camera/code';
-import ScanScreen from './scan/code';
-import ResultScreen from './result/code';
-import HistoryScreen from './history/code';
-import ChatScreen from './chat/code';
+import HomeScreen from "./home/code";
+import CameraScreen from "./camera/code";
+import ScanScreen from "./scan/code";
+import ResultScreen from "./result/code";
+import HistoryScreen from "./history/code";
+import ChatScreen from "./chat/code";
 
 // Maps a screen key -> the bottom-tab that should appear "active"
 const SCREEN_TO_TAB = {
-  home: 'home',
-  camera: 'scan',
-  scan: 'scan',
-  result: 'scan',
-  history: 'history',
-  guides: 'guides',
-  chat: 'chat',
-  settings: 'settings',
+  home: "home",
+  camera: "scan",
+  scan: "scan",
+  result: "scan",
+  history: "history",
+  guides: "guides",
+  chat: "chat",
+  settings: "settings",
 };
 
 // Real screens for the remaining nav tabs (were placeholders before)
-import GuidesScreen from './guides/code';
-import SettingsScreen from './settings/code';
+import GuidesScreen from "./guides/code";
+import SettingsScreen from "./settings/code";
 
 // ── Auth gate ───────────────────────────────────────────────────────────
 // The Google OAuth flow is fully implemented (auth.js + LoginScreen +
 // /auth/google backend). The gate is OFF by default so the app is usable
 // without Google credentials; flip it on for production by setting
-// `expo.extra.requireAuth = true` in app.json once GOOGLE_CLIENT_ID /
-// GOOGLE_CLIENT_SECRET are configured. NO fake user is ever injected.
+// REQUIRE_AUTH=true in .env (consumed by react-native-config at build time)
+// once GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are configured. NO fake user
+// is ever injected.
 function isAuthRequired() {
   try {
-    const { expoConfig } = require('expo-constants');
-    return !!(expoConfig && expoConfig.extra && expoConfig.extra.requireAuth);
+    const Config = require('react-native-config');
+    return Config && Config.REQUIRE_AUTH === 'true';
   } catch {
     return false;
   }
@@ -97,7 +113,7 @@ const REQUIRE_AUTH = isAuthRequired();
 
 export default function App() {
   const { loaded: fontsLoaded } = useFonts();
-  const [screen, setScreen] = useState('home');
+  const [screen, setScreen] = useState("home");
   const [params, setParams] = useState({});
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(!REQUIRE_AUTH);
@@ -130,42 +146,45 @@ export default function App() {
 
   let ActiveScreen;
   switch (screen) {
-    case 'home':
+    case "home":
       ActiveScreen = HomeScreen;
       break;
-    case 'camera':
+    case "camera":
       ActiveScreen = CameraScreen;
       break;
-    case 'scan':
+    case "scan":
       ActiveScreen = ScanScreen;
       break;
-    case 'result':
+    case "result":
       ActiveScreen = ResultScreen;
       break;
-    case 'history':
+    case "history":
       ActiveScreen = HistoryScreen;
       break;
-    case 'guides':
+    case "guides":
       ActiveScreen = GuidesScreen;
       break;
-    case 'settings':
+    case "settings":
       ActiveScreen = SettingsScreen;
       break;
-    case 'chat':
+    case "chat":
       ActiveScreen = ChatScreen;
       break;
     default:
       ActiveScreen = HomeScreen;
   }
 
-  // Not authenticated → show Login screen
-  if (!authReady || !user) {
+  // When the auth gate is OFF (requireAuth not set — the default), the app is
+  // usable without Google credentials, so render the Home screen directly.
+  // Only fall back to Login when auth is actually required AND we have no
+  // verified session yet.
+  if (REQUIRE_AUTH && (!authReady || !user)) {
     const loginNav = {
       navigate: (nextScreen, nextParams = {}) => {
         setParams(nextParams);
         setScreen(nextScreen);
       },
-      screen: 'login',
+      screen: "login",
       params: {},
     };
     return (
@@ -187,12 +206,17 @@ export default function App() {
           <StatusBar barStyle="dark-content" backgroundColor={colors.paper} />
           <ActiveScreen navigation={navigation} route={{ params }} />
           {/* BottomNav is hidden on the full-screen task flows (camera / scan /
-              result) so it cannot overlap the camera shutter and the analysis
-              preview sheet's "Phân tích ngay" button (z-index stacking bug that
-              intercepted taps). It stays available on the tabbed routes. */}
-          {screen !== 'camera' && screen !== 'scan' && screen !== 'result' ? (
+              chat) so it cannot overlap the camera shutter and the analysis
+              preview sheet's "Phân tích ngay" button, or the chat
+              composer (z-index stacking bug that
+              intercepted taps). It stays available on the tabbed routes.
+              Result is shown because users often want to navigate elsewhere
+              after viewing a diagnosis. */}
+          {screen !== "camera" &&
+          screen !== "scan" &&
+          screen !== "chat" ? (
             <BottomNav
-              activeTab={SCREEN_TO_TAB[screen] || 'home'}
+              activeTab={SCREEN_TO_TAB[screen] || "home"}
               onTabPress={(tab) => {
                 setParams({});
                 setScreen(tab);

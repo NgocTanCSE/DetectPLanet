@@ -1,0 +1,15 @@
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/CMakeFiles/appmodules.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/safeareacontext_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/safeareacontext_autolinked_build/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/rnsvg_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/rnsvg_autolinked_build/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/RNImagePickerSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/RNImagePickerSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/RNCConfigSpec_autolinked_build/CMakeFiles/react_codegen_RNCConfigSpec.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/RNCConfigSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/x86_64/RNCConfigSpec_autolinked_build/CMakeFiles/rebuild_cache.dir

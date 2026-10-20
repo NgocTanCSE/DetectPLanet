@@ -1,10 +1,13 @@
 /**
- * ChatScreen — AI chat for plant disease Q&A
+ * ChatScreen — AI chat for plant disease Q&A (Text-Only Redesign)
  *
  * Uses Cloudflare Workers AI (chat model) via PHP API proxy.
  * Single method of interaction: text chat with the AI assistant.
- * Nature-inspired green palette: forest green primary, mint/amber/red status
- * accents, clean white surfaces, charcoal text.
+ * Nature-inspired green palette: forest green primary, clean white surfaces.
+ *
+ * Text-only redesign: the psychology avatar icon is replaced with a
+ * green-dot mark. The send icon is replaced with "Gửi" text.
+ * The refresh action is already text-only in AppHeader.
  */
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -18,10 +21,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { colors, spacing, typography, shadowPaper } from '../theme';
-import Icon from '../icons';
-import AppHeader from '../AppHeader';
+import { colors, spacing, typography, shadowFlat } from '../theme';
+import AppHeader, { useTopInset, HEADER_HEIGHT } from '../AppHeader';
 import { chatWithAI } from '../api';
+import Icon from '../icons';
 
 const SYSTEM_PROMPT = 'Bạn là trợ lý AI AgriScan, chuyên về nông nghiệp và trồng trọt. Trả lời ngắn gọn, thực tế, bằng tiếng Việt.';
 
@@ -39,6 +42,7 @@ export default function ChatScreen({ navigation }) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef(null);
+  const topInset = useTopInset();
 
   useEffect(() => {
     // Scroll to bottom on new messages
@@ -74,19 +78,19 @@ export default function ChatScreen({ navigation }) {
 
   const renderMessage = (msg, idx) => {
     const isUser = msg.role === 'user';
-    const isSystem = msg.role === 'system';
 
-    if (isSystem) return null; // Don't render system messages
+    if (msg.role === 'system') return null; // Don't render system messages
 
     const align = isUser ? 'flex-end' : 'flex-start';
     const bg = isUser ? colors.primary : colors.paper;
     const color = isUser ? colors['on-primary'] : colors['on-surface'];
 
     return (
-      <View key={idx} style={[styles.msgContainer, { alignSelf: align, backgroundColor: bg }]}>
+      <View key={idx} style={[styles.msgContainer, { alignSelf: align, backgroundColor: bg, borderBottomRightRadius: isUser ? 4 : 8, borderBottomLeftRadius: isUser ? 8 : 4 }]}>
         {!isUser && (
-          <View style={[styles.avatar, { backgroundColor: colors['primary-fixed'] }]}>
-            <Icon name="psychology" size={16} color={colors.primary} />
+          /* Green-dot mark instead of psychology avatar icon */
+          <View style={[styles.avatar, { backgroundColor: colors['primary-subtle'] }]}>
+            <View style={[styles.avatarDot, { backgroundColor: colors.primary }]} />
           </View>
         )}
         <Text style={[styles.msgText, { color, fontFamily: 'PlusJakartaSans-Regular' }]}>
@@ -110,14 +114,19 @@ export default function ChatScreen({ navigation }) {
       <ScrollView
         ref={scrollViewRef}
         style={styles.messages}
-        contentContainerStyle={{ paddingBottom: 16, gap: 12, paddingTop: 64 }}
+        contentContainerStyle={{
+          paddingBottom: 16,
+          gap: 12,
+          paddingTop: topInset + HEADER_HEIGHT,
+          paddingHorizontal: spacing.gutter,
+        }}
         showsVerticalScrollIndicator={false}
       >
         {messages.map(renderMessage)}
         {loading && (
-          <View style={[styles.msgContainer, { alignSelf: 'flex-start', backgroundColor: colors.paper, ...shadowPaper }]}>
-            <View style={[styles.avatar, { backgroundColor: colors['primary-fixed'] }]}>
-              <Icon name="psychology" size={16} color={colors.primary} />
+          <View style={[styles.msgContainer, { alignSelf: 'flex-start', backgroundColor: colors.paper }]}>
+            <View style={[styles.avatar, { backgroundColor: colors['primary-subtle'] }]}>
+              <View style={[styles.avatarDot, { backgroundColor: colors.primary }]} />
             </View>
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
@@ -147,7 +156,12 @@ export default function ChatScreen({ navigation }) {
           {loading ? (
             <ActivityIndicator color={colors['on-primary']} size="small" />
           ) : (
-            <Icon name="send" size={20} color={colors['on-primary']} />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Icon name="send" size={16} color={colors['on-primary']} />
+              <Text style={[typography.body.md, { color: colors['on-primary'], fontWeight: '600' }]}>
+                Gửi
+              </Text>
+            </View>
           )}
         </TouchableOpacity>
       </KeyboardAvoidingView>
@@ -160,7 +174,7 @@ const styles = StyleSheet.create({
   messages: { flex: 1 },
   msgContainer: {
     maxWidth: '80%',
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 10,
     flexDirection: 'row',
@@ -168,16 +182,21 @@ const styles = StyleSheet.create({
     gap: 8,
     marginHorizontal: spacing.gutter,
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
+  },
+  avatarDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3,
   },
   msgText: {
     fontSize: 15,
@@ -192,18 +211,15 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 16 : 8,
     paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: colors['outline'],
+    borderTopColor: colors.outline,
     backgroundColor: colors.paper,
-    // Lift the composer above the floating BottomNav (zIndex 10). zIndex only
-    // takes effect on a positioned element, so set position:relative here.
     position: 'relative',
     zIndex: 11,
-    elevation: 2,
   },
   input: {
     flex: 1,
     backgroundColor: colors['surface-container-low'],
-    borderRadius: 16,
+    borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 15,
@@ -211,22 +227,18 @@ const styles = StyleSheet.create({
     minHeight: 40,
     maxHeight: 100,
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
     fontFamily: 'PlusJakartaSans-Regular',
   },
   sendBtn: {
     width: 44,
     height: 44,
-    borderRadius: 22,
+    borderRadius: 8,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     ...(Platform.OS === 'web'
-      ? {
-          cursor: 'pointer',
-          WebkitUserSelect: 'none',
-          userSelect: 'none',
-        }
+      ? { cursor: 'pointer', WebkitUserSelect: 'none', userSelect: 'none' }
       : {}),
   },
   sendBtnDisabled: {

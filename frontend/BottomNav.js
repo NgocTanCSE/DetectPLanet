@@ -1,8 +1,10 @@
 /**
  * AgriScan AI — Bottom Navigation Bar
  *
- * Clean, minimalist bar with forest green as the sole accent color.
- * Removes deep green shadows in favor of subtle paper-like elevation.
+ * Icon + text navigation strip at the bottom of the screen.
+ * Each tab shows a 20×20 SVG icon from icons.js + a single-line label.
+ * Active tabs use the forest-green accent (#006c49); inactive tabs are muted.
+ * The central "Quét lá" tab is a primary CTA (green text on green-subtle bg).
  */
 import React from 'react';
 import {
@@ -11,14 +13,15 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
-import { colors, typography, radius } from './theme';
+import { colors, typography, z } from './theme';
 import Icon from './icons';
 
 export const TABS = [
   { key: 'home', label: 'Trang chủ', icon: 'home' },
   { key: 'history', label: 'Lịch sử', icon: 'history' },
-  { key: 'scan', label: '', icon: 'qr_code_scanner' },
+  { key: 'scan', label: 'Quét lá', icon: 'qr_code_scanner' },
   { key: 'guides', label: 'Cẩm nang', icon: 'menu_book' },
   { key: 'chat', label: 'Chat AI', icon: 'psychology' },
   { key: 'settings', label: 'Cài đặt', icon: 'settings' },
@@ -26,7 +29,18 @@ export const TABS = [
 
 const isIos = Platform.OS === 'ios';
 
+// Desktop breakpoint: >= 768px renders all 6 tabs inline.
+const DESKTOP_BREAKPOINT = 768;
+
+// Web-only interactive cursor.
+const webCursor = Platform.OS === 'web'
+  ? { cursor: 'pointer', userSelect: 'none' }
+  : {};
+
 const BottomNav = ({ activeTab = 'home', onTabPress = () => {} }) => {
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= DESKTOP_BREAKPOINT;
+
   const handlePress = (tab) => {
     if (tab.key === 'scan') {
       onTabPress('camera');
@@ -39,41 +53,35 @@ const BottomNav = ({ activeTab = 'home', onTabPress = () => {} }) => {
     const active = activeTab === tab.key;
     const isScan = tab.key === 'scan';
 
-    if (isScan) {
-      return (
-        <TouchableOpacity
-          key={tab.key}
-          activeOpacity={0.88}
-          onPress={() => handlePress(tab)}
-          style={styles.scanButton}>
-          <Icon name="photo_camera" size={24} color={colors['on-primary']} />
-        </TouchableOpacity>
-      );
-    }
-
     return (
       <TouchableOpacity
         key={tab.key}
         activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel={tab.label}
         onPress={() => handlePress(tab)}
-        style={styles.tab}>
-        <Icon
-          name={tab.icon}
-          size={active ? 20 : 19}
-          color={active ? colors.primary : colors.muted}
-        />
-        {tab.label !== '' ? (
-          <Text
-            style={[
-              styles.tabLabelText,
-              {
-                color: active ? colors.primary : colors.muted,
-                fontWeight: active ? '600' : '400',
-              },
-            ]}>
-            {tab.label}
-          </Text>
-        ) : null}
+        style={[
+          styles.tab,
+          isScan && active && styles.scanTabActive,
+          isScan && active && webCursor,
+          isScan && !active && webCursor,
+          !isScan && webCursor,
+        ]}>
+        <Text
+          style={[
+            styles.tabLabel,
+            {
+              color: active ? colors.primary : colors.muted,
+              fontWeight: active ? '600' : '400',
+            },
+          ]}
+          numberOfLines={1}
+        >
+          {tab.label}
+        </Text>
+        {active && !isScan && (
+          <View style={styles.activeDot} />
+        )}
       </TouchableOpacity>
     );
   };
@@ -82,15 +90,48 @@ const BottomNav = ({ activeTab = 'home', onTabPress = () => {} }) => {
     <View
       style={[
         styles.nav,
-        isIos && { paddingBottom: 16 },
+        isDesktop && styles.navDesktop,
+        isIos && { paddingBottom: 0 },
       ]}>
-      <View style={styles.row}>
-        {renderTab(TABS[0])}
-        {renderTab(TABS[1])}
-        {renderTab(TABS[2])}
-        {renderTab(TABS[3])}
-        {renderTab(TABS[4])}
-        {renderTab(TABS[5])}
+      <View style={[styles.row, { height: 56 }]}>
+        {TABS.map((tab) => {
+          const active = activeTab === tab.key;
+          const isScan = tab.key === 'scan';
+          const iconColor = active ? colors.primary : colors.muted;
+
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={tab.label}
+              onPress={() => handlePress(tab)}
+              style={[
+                styles.tab,
+                isScan && active && styles.scanTabActive,
+                isScan && active && webCursor,
+                isScan && !active && webCursor,
+                !isScan && webCursor,
+              ]}>
+              <Icon name={tab.icon} size={20} color={iconColor} style={styles.tabIcon} />
+              <Text
+                style={[
+                  styles.tabLabel,
+                  {
+                    color: active ? colors.primary : colors.muted,
+                    fontWeight: active ? '600' : '400',
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {tab.label}
+              </Text>
+              {active && !isScan && (
+                <View style={styles.activeDot} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
     </View>
   );
@@ -104,52 +145,47 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: colors.paper,
     borderTopWidth: 1,
-    borderColor: colors['outline'],
-    shadowColor: '#141414',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
-    zIndex: 10,
+    borderColor: colors.outline,
+    elevation: 0,
+    zIndex: z.nav,
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignItems: 'center',
-    height: 60,
-    position: 'relative',
+    justifyContent: 'space-around',
+    height: 48,
     paddingHorizontal: 4,
   },
   tab: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    width: 60,
-    height: 52,
-    gap: 3,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
   },
-  tabLabelText: {
-    fontSize: 10.5,
-    fontFamily: 'PlusJakartaSans-Regular',
+  tabLabel: {
+    fontSize: 13,
+    fontFamily: 'PlusJakartaSans-Medium',
+    marginTop: 4,
   },
-  scanButton: {
-    position: 'absolute',
-    left: '50%',
-    top: -16,
-    marginLeft: -26,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  tabIcon: {
+    marginBottom: 2,
+  },
+  activeDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#141414',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-    zIndex: 11,
-    borderWidth: 3,
-    borderColor: colors['outline'],
+    marginTop: 2,
+  },
+  scanTabActive: {
+    backgroundColor: colors['primary-subtle'],
+    borderRadius: 8,
+    marginVertical: 4,
+    marginHorizontal: 2,
+  },
+  navDesktop: {
+    height: 48,
   },
 });
 

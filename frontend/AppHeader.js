@@ -1,13 +1,34 @@
 /**
  * AgriScan AI — Top App Header
  *
- * Clean, minimal header with soft shadow and green accent.
+ * Flat header with back-arrow icon + text buttons. A subtle green dot serves
+ * as the brand mark when the back button is hidden. All title/subtitle text
+ * uses numberOfLines={1} to prevent line wrapping.
  */
 import React from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { colors, typography, radius } from './theme';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native';
+import { colors, typography, z } from './theme';
 import Icon from './icons';
 import { getCurrentUser } from './auth';
+
+export const HEADER_HEIGHT = 44;
+export const DESKTOP_BREAKPOINT = 768;
+
+/**
+ * Cross-platform top inset.
+ * - iOS: 44pt (static safe-area baseline for notch/status bar).
+ * - Android: real status bar height via `StatusBar.currentHeight` (RN API).
+ * - web/other: 0 (browser handles the status bar).
+ */
+export function useTopInset() {
+  if (Platform.OS === 'ios') {
+    return 44;
+  }
+  if (Platform.OS === 'android') {
+    return StatusBar.currentHeight || 0;
+  }
+  return 0;
+}
 
 const AppHeader = ({
   title = 'AgriScan AI',
@@ -16,69 +37,65 @@ const AppHeader = ({
   onBack = () => {},
   actions = [],
 }) => {
-  const hasSafeTop = Platform.OS === 'ios';
+  const topInset = useTopInset();
   const user = getCurrentUser();
+
+  const webCursor = Platform.OS === 'web'
+    ? { cursor: 'pointer', userSelect: 'none' }
+    : {};
 
   return (
     <View
       style={[
         styles.header,
-        hasSafeTop && { paddingTop: 44 },
+        { paddingTop: topInset },
       ]}>
       <View style={styles.headerInner}>
         {/* LEFT */}
         <View style={styles.left}>
-   {showBack ? (
-             <TouchableOpacity
-               accessibilityLabel="Quay lại"
-               style={[
-                   styles.backBtn,
-                   Platform.OS === 'web'
-                     ? {
-                         cursor: 'pointer',
-                         WebkitUserSelect: 'none',
-                         userSelect: 'none',
-                       }
-                     : {},
-                 ]}
-               onPress={onBack}>
-               <Icon name="arrow_back_ios_new" size={18} color={colors['on-surface']} />
-             </TouchableOpacity>
-           ) : (
-             <View style={styles.logoBadge}>
-               <Icon name="eco" size={17} color={colors.primary} />
-             </View>
-           )}
+          {showBack ? (
+            <TouchableOpacity
+              accessibilityLabel="Quay lại"
+              style={[styles.textBtn, webCursor, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+              onPress={onBack}>
+              <Icon name="arrow_back_ios_new" size={16} color={colors['on-surface']} />
+              <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '500' }]}
+                numberOfLines={1}>
+                Quay lại
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.brandMark}>
+              <View style={styles.greenDot} />
+              <Text style={[typography.headline.sm, { color: colors['on-surface'] }]}>
+                {title}
+              </Text>
+            </View>
+          )}
 
           <View>
-            <Text style={styles.title}>{title}</Text>
-            {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+            <Text style={styles.title} numberOfLines={1}>{title}</Text>
+            {subtitle ? <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text> : null}
           </View>
         </View>
 
-         {/* RIGHT */}
-         <View style={styles.right}>
-           {actions.map((a, i) => (
-             <TouchableOpacity
-               key={a.label || i}
-               accessibilityLabel={a.label}
-               style={[
-                   styles.actionBtn,
-                   Platform.OS === 'web'
-                     ? {
-                         cursor: 'pointer',
-                         WebkitUserSelect: 'none',
-                         userSelect: 'none',
-                       }
-                     : {},
-                 ]}
-               onPress={a.onPress}>
-               <Icon name={a.icon} size={a.size || 18} color={a.color || colors['on-surface-variant']} />
-             </TouchableOpacity>
-           ))}
+        {/* RIGHT */}
+        <View style={styles.right}>
+          {actions.map((a, i) => (
+            <TouchableOpacity
+              key={a.label || i}
+              accessibilityLabel={a.label}
+              style={[styles.textBtn, webCursor]}
+              onPress={a.onPress}>
+              <Text style={[typography.body.md, { color: colors['on-surface-variant'], fontWeight: '500' }]}>
+                {a.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
 
           {user?.avatar && !user.avatar.includes('favicon.ico') ? (
-            <Image source={{ uri: user.avatar }} style={styles.profile} />
+            <Image source={{ uri: user.avatar }} style={styles.profile}
+            onError={(e) => console.warn('Profile image error:', e.nativeEvent?.error)} />
           ) : (
             <View style={styles.profileFallback}>
               <Text style={styles.profileInitial}>
@@ -100,17 +117,13 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: colors.paper,
     borderBottomWidth: 1,
-    borderColor: colors['outline'],
-    shadowColor: '#141414',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-    zIndex: 20,
+    borderColor: colors.outline,
+    elevation: 0,
+    zIndex: z.header,
   },
   headerInner: {
-    height: 54,
-    paddingHorizontal: 16,
+    height: 44,
+    paddingHorizontal: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -118,25 +131,24 @@ const styles = StyleSheet.create({
   left: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    flexShrink: 1,
   },
-  logoBadge: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: colors['primary-fixed'],
+  brandMark: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 6,
+    marginRight: 8,
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors['surface-container-low'],
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors['outline'],
+  greenDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  textBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
   },
   title: {
     color: colors['on-surface'],
@@ -155,28 +167,18 @@ const styles = StyleSheet.create({
   right: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  actionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors['surface-container-low'],
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors['outline'],
+    gap: 6,
   },
   profile: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
   },
   profileFallback: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: colors['primary-fixed'],
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors['primary-subtle'],
     alignItems: 'center',
     justifyContent: 'center',
   },

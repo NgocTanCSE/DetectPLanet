@@ -26,8 +26,7 @@
  * @typedef {Object} HealthStat  — home "today overview" stat card
  * @property {string} label
  * @property {string} value
- * @property {string} icon       // Icon name
- * @property {string} color      // theme color key
+ * @property {string} color      // theme color key (maps to severity)
  */
 
 /**
@@ -57,13 +56,10 @@
 /**
  * @typedef {Object} ScanPipelineStep
  * @property {string} id
- * @property {string} icon
  * @property {string} title
  * @property {string} desc
  * @property {string} status     // e.g. "78%", "Hoàn tất", "Chờ"
  * @property {boolean} active
- * @property {string} iconBg
- * @property {string} iconColor
  */
 
 /**
@@ -88,7 +84,6 @@
 
 /**
  * @typedef {Object} ReportSection
- * @property {string} icon
  * @property {string} title
  * @property {string} body
  * @property {string} [badge]
@@ -100,7 +95,6 @@
 /**
  * @typedef {Object} AccordionItem
  * @property {string} id
- * @property {string} icon
  * @property {string} title
  * @property {string} subtitle
  * @property {ReportSection[]} sections
@@ -179,17 +173,17 @@
 // ---------------------------------------------------------------------------
 // Zero-value factories (NOT sample data). Used to seed state + type guards.
 // ---------------------------------------------------------------------------
-export const emptyStat = () => ({ label: '', value: '', icon: 'info', color: '' });
+export const emptyStat = () => ({ label: '', value: '', color: '' });
 export const emptyScan = () => ({ id: '', plant: '', disease: '', image: '', confidence: '', severity: 'healthy', time: '', label: '' });
 export const emptyArticle = () => ({ id: '', image: '', label: '', labelColor: '', time: '', title: '', action: '', tagBg: '' });
-export const emptyStep = () => ({ id: '', icon: 'hourglass_empty', title: '', desc: '', status: '', active: false, iconBg: '', iconColor: '' });
+export const emptyStep = () => ({ id: '', title: '', desc: '', status: '', active: false });
 export const emptyScanSession = () => ({ id: '', crop: '', disease: '', image: '', confidence: '', severity: 'healthy', time: '', pipeline: [], detections: [] });
 export const emptyCapture = () => ({ uri: '', crop: '', issues: '' });
-export const emptySection = () => ({ icon: 'lens_blur', title: '', body: '' });
-export const emptyAccordion = () => ({ id: '', icon: 'help', title: '', subtitle: '', sections: [] });
+export const emptySection = () => ({ title: '', body: '' });
+export const emptyAccordion = () => ({ id: '', title: '', subtitle: '', sections: [] });
 export const emptyStatus = () => ({ spread: '', stage: '', loss: '' });
 export const emptyReport = () => ({ id: '', crop: '', disease: '', pathogen: '', severity: 'healthy', image: '', confidence: '', time: '', status: emptyStatus(), recommendation: '', accordion: [], detections: [] });
-export const emptyFilter = () => ({ key: '', label: '', icon: 'filter_list' });
+export const emptyFilter = () => ({ key: '', label: '' });
 export const emptyRecord = () => ({ id: '', crop: '', cropLabel: '', title: '', confidence: '', severity: 'healthy', time: '', image: '' });
 export const emptySummary = () => ({ saved: '0', stats: [], segments: [] });
 export const emptyChatMessage = () => ({ role: 'user', content: '' });

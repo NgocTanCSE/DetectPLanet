@@ -1,19 +1,23 @@
 /**
- * CameraScreen — AgriScan AI Camera Viewfinder
+ * CameraScreen — AgriScan AI Camera / Image Picker (Text-Only Redesign)
  *
- * Live preview via expo-camera `CameraView` (native + web secure-context),
- * replacing the old placeholder that only launched the system camera app.
+ * In the React Native CLI workflow this screen uses `react-native-image-picker`
+ * for both capture and library selection (system camera app + photo picker):
+ *   - `launchCamera()`  → opens the system camera app (Android "Chụp trực tiếp")
+ *   - `launchImageLibrary()` → opens the system photo picker ("Chọn từ thư viện")
  *
- * Robust fallbacks:
- *  - Web over a non-secure context (http://<LAN>:8081 on a phone) blocks the
- *    camera, so we fall back to the photo library (still lets users pick an
- *    image and run the analysis).
- *  - If the camera permission is denied, we prompt and otherwise fall back to
- *    the photo library so the capture button always does *something*.
- *  - If the live preview errors out (onMountError), we gracefully degrade to
- *    the placeholder + system fallback.
+ * Both return `includeBase64: true` so the captured image can be POSTed to the
+ * /analyze endpoint as a base64 string (the same contract the backend expects).
+ *
+ * Text-light redesign: icons are used sparingly (flash toggle, grid toggle).
+ * Shutter → plain green circle (no icon).
+ * Corner brackets, viewfinder pill, and all decorative SVG paths removed.
+ *
+ * New feature: Image Quality Check — a lightweight blur-detection heuristic
+ * runs on the captured image before the "Phân tích ngay" button appears,
+ * showing a text-only quality indicator.
  */
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -25,21 +29,11 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { CameraView, useCameraPermissions, CameraType, FlashMode } from 'expo-camera';
-import { colors, typography, spacing, shadowCard, shadowPaper } from '../theme';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { colors, typography, spacing, shadowFlat, z } from '../theme';
 import Icon from '../icons';
-import AppHeader from '../AppHeader';
+import AppHeader, { useTopInset, HEADER_HEIGHT } from '../AppHeader';
 import { emptyCapture } from '../dto';
-
-// expo-camera does NOT export `CameraType` / `FlashMode` on web
-// (build/Camera.types.js only re-exports `PermissionStatus`), so they are
-// `undefined` when the bundle resolves to the web entry. The web camera screen
-// never renders a live `<CameraView>` (it falls back to the photo library), but
-// these local fallbacks keep the module web-safe so `useState(CameraType.back)`
-// and friends never crash the whole tree on `Platform.OS === 'web'`.
-const Facing = CameraType && CameraType.back ? CameraType : { back: 'back', front: 'front' };
-const Flash = FlashMode && FlashMode.on ? FlashMode : { on: 'on', off: 'off' };
 
 const modes = [
   { key: 'single', label: 'Chụp trực tiếp' },
@@ -48,144 +42,185 @@ const modes = [
 
 const CAMERA_QUALITY = 0.8;
 
+// ── Image Quality Check ──────────────────────────────────────────────
+/**
+ * Lightweight blur-detection heuristic.
+ * On web we attempt a variance-of-Laplacian via an off-screen canvas.
+ * On native (or when anything fails), we fall back to a base64-size heuristic:
+ * a real leaf photo is at least ~10 KB of base64; anything smaller is suspect.
+ *
+ * Returns: { score: number(0-100), isGood: boolean, message: string }
+ */
+function checkImageQuality(base64) {
+  if (!base64) return { score: 0, isGood: false, message: 'Chưa có ảnh' };
+
+  // Heuristic: base64 size correlates with resolution / detail.
+  const len = base64.replace(/^data:image\/[^;]+;base64,/, '').length;
+  if (len < 5000) {
+    return { score: 30, isGood: false, message: 'Ảnh quá nhỏ, vui lòng chụp lại' };
+  }
+
+  // On web, try a proper variance-of-Laplacian for a sharper signal.
+  if (typeof document !== 'undefined' && typeof HTMLCanvasElement !== 'undefined') {
+    try {
+      const img = new Image();
+      img.src = `data:image/jpeg;base64,${base64}`;
+      // Synchronous decode (works in jsdom if already in cache / data URI).
+      const canvas = document.createElement('canvas');
+      const MAX = 80; // downscale to keep it cheap
+      canvas.width = MAX;
+      canvas.height = MAX;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, MAX, MAX);
+
+      const gray = [];
+      const imageData = ctx.getImageData(0, 0, MAX, MAX);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        gray.push(0.299 * r + 0.587 * g + 0.114 * b);
+      }
+
+      // Sobel / Laplacian kernel (simplified 3x3 Laplacian)
+      let lapSum = 0;
+      let count = 0;
+      for (let y = 1; y < MAX - 1; y++) {
+        for (let x = 1; x < MAX - 1; x++) {
+          const idx = y * MAX + x;
+          const lap =
+            gray[idx - MAX] * 0 +
+            gray[idx - 1] * 0 +
+            gray[idx + 1] * 0 +
+            gray[idx + MAX] * 0 +
+            (gray[idx] * -4) +
+            gray[idx - MAX - 1] * 1 +
+            gray[idx - MAX + 1] * 1 +
+            gray[idx + MAX - 1] * 1 +
+            gray[idx + MAX + 1] * 1;
+          lapSum += Math.abs(lap);
+          count++;
+        }
+      }
+      const variance = count > 0 ? lapSum / count : 0;
+      const score = Math.min(100, Math.round(variance / 3));
+      const isGood = score >= 30;
+      return {
+        score,
+        isGood,
+        message: isGood ? 'Chất lượng ảnh tốt' : 'Ảnh mờ, vui lòng chụp lại',
+      };
+    } catch {
+      // canvas failed — fall through to base64 heuristic
+    }
+  }
+
+  // Fallback heuristic
+  if (len > 30000) {
+    return { score: 75, isGood: true, message: 'Chất lượng ảnh tốt' };
+  }
+  return { score: 45, isGood: true, message: 'Chất lượng ảnh tốt' };
+}
+
+// ── CameraScreen ────────────────────────────────────────────────────
 const CameraScreen = ({ navigation }) => {
+  const topInset = useTopInset();
   const [mode, setMode] = useState('single');
   const [flashOn, setFlashOn] = useState(false);
-  const [gridVisible, setGridVisible] = useState(true);
+  const [gridVisible, setGridVisible] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [facing, setFacing] = useState(Facing.back);
   const [captured, setCaptured] = useState(emptyCapture());
-  const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState(false);
-
-  const cameraRef = useRef(null);
-  const [permission, requestPermission] = useCameraPermissions();
-
-  const granted = permission?.status === 'granted';
-  // Show the live feed only when permission is granted and the preview has
-  // actually mounted without error.
-  // Show the live feed only when permission is granted, the preview has
-  // actually mounted without error, and we are on a native platform. On web we
-  // always fall back to the photo-library picker — expo-camera's live web
-  // preview requires a secure context + a device camera (unavailable in
-  // `expo start` http dev / headless CI), and `CameraType` is undefined there.
-  const canStream = granted && !cameraError && Platform.OS !== 'web';
+  const [loading, setLoading] = useState(false);
+  const [quality, setQuality] = useState(null);
 
   const onBack = () => navigation?.navigate?.('home');
 
-  // Capture from the live CameraView (native + secure web context).
-  const captureFromLiveCamera = async () => {
-    if (!cameraRef.current || !cameraReady) return;
+  // ── Image capture: opens the system camera app ──────────────────────
+  const captureFromSystemCamera = async () => {
     try {
-      const photo = await cameraRef.current.takePictureAsync({
+      const result = await launchCamera({
+        mediaType: 'photo',
         quality: CAMERA_QUALITY,
-        base64: true,
-        skipProcessing: false,
+        includeBase64: true,
+        cameraType: 'back',
+        saveToPhotos: false,
       });
-      setCaptured({
-        uri: photo.uri,
-        base64: photo.base64,
-        crop: 'Mẫu lá chụp trực tiếp',
-        time: 'Vừa chụp xong',
-      });
-      setShowPreview(true);
+
+      if (result.didCancel) return;
+      if (result.errorCode) {
+        Alert.alert('Lỗi máy ảnh', result.errorMessage || 'Không thể chụp ảnh.');
+        return;
+      }
+      if (result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const newCapture = {
+          uri: asset.uri,
+          base64: asset.base64 || '',
+          crop: 'Mẫu lá chụp trực tiếp',
+          time: 'Vừa chụp xong',
+        };
+        setCaptured(newCapture);
+        setQuality(checkImageQuality(newCapture.base64));
+        setShowPreview(true);
+      }
     } catch (err) {
       Alert.alert(
-        'Lỗi máy ảnh',
-        'Không thể chụp ảnh lúc này. Vui lòng chọn ảnh từ thư viện.',
-        [{ text: 'OK', onPress: openImageLibrary }],
+        'Không thể mở máy ảnh',
+        'Vui lòng thử lại hoặc chọn ảnh từ thư viện.',
       );
     }
   };
 
-  // System fallback (web cannot use launchCameraAsync at all; native uses it).
-   const captureWithSystemCamera = async () => {
-     try {
-       if (Platform.OS === 'web') {
-         // On web, we don't have access to the system camera, so we open the image library directly.
-         openImageLibrary();
-         return;
-       }
-       const { status } = await ImagePicker.requestCameraPermissionsAsync();
-       if (status !== 'granted' && status !== undefined) {
-         Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền sử dụng Camera để chụp ảnh lá cây.');
-         return;
-       }
-       const result = await ImagePicker.launchCameraAsync({
-         mediaTypes: ['images'],
-         allowsEditing: true,
-         quality: CAMERA_QUALITY,
-         base64: true,
-       });
-       if (!result.canceled && result.assets && result.assets.length > 0) {
-         const asset = result.assets[0];
-         setCaptured({
-           uri: asset.uri,
-           base64: asset.base64,
-           crop: 'Mẫu lá chụp trực tiếp',
-           time: 'Vừa chụp xong',
-         });
-         setShowPreview(true);
-       }
-     } catch (err) {
-       Alert.alert(
-         'Không thể mở máy ảnh',
-         'Vui lòng thử lại hoặc chọn ảnh từ thư viện.',
-         [{ text: 'OK', onPress: openImageLibrary }],
-       );
-     }
-   };
+  // ── Image library: opens the system photo picker ────────────────────
+  const openImageLibrary = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        quality: CAMERA_QUALITY,
+        includeBase64: true,
+        selectionLimit: 1,
+      });
 
-   const openImageLibrary = async () => {
-     try {
-       // Request media library permission only on native platforms
-       if (Platform.OS !== 'web') {
-         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-         if (status !== 'granted' && status !== undefined) {
-           Alert.alert('Quyền truy cập', 'Ứng dụng cần quyền truy cập Thư viện ảnh để chọn ảnh lá cây.');
-           return;
-         }
-       }
-       const result = await ImagePicker.launchImageLibraryAsync({
-         mediaTypes: ['images'],
-         allowsEditing: true,
-         quality: CAMERA_QUALITY,
-         base64: true,
-       });
-       if (!result.canceled && result.assets && result.assets.length > 0) {
-         const asset = result.assets[0];
-         setCaptured({
-           uri: asset.uri,
-           base64: asset.base64,
-           crop: 'Ảnh chọn từ thư viện',
-           time: 'Vừa chọn xong',
-         });
-         setShowPreview(true);
-       }
-     } catch (err) {
-       Alert.alert('Không thể mở Thư viện ảnh', 'Vui lòng thử lại.');
-     }
-   };
-
-  const takePhoto = () => {
-    if (mode === 'multi') {
-      openImageLibrary();
-      return;
-    }
-    if (canStream && cameraReady && cameraRef.current) {
-      captureFromLiveCamera();
-    } else {
-      captureWithSystemCamera();
+      if (result.didCancel) return;
+      if (result.errorCode) {
+        Alert.alert('Lỗi thư viện ảnh', result.errorMessage || 'Không thể mở thư viện.');
+        return;
+      }
+      if (result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const newCapture = {
+          uri: asset.uri,
+          base64: asset.base64 || '',
+          crop: 'Ảnh chọn từ thư viện',
+          time: 'Vừa chọn xong',
+        };
+        setCaptured(newCapture);
+        setQuality(checkImageQuality(newCapture.base64));
+        setShowPreview(true);
+      }
+    } catch (err) {
+      Alert.alert('Không thể mở Thư viện ảnh', 'Vui lòng thử lại.');
     }
   };
 
-  const onShutter = () => {
-    takePhoto();
+  // ── Shutter button handler (delegates to the active mode) ─────────────
+  const takePhoto = () => {
+    if (loading) return;
+    if (mode === 'multi') {
+      openImageLibrary();
+    } else {
+      captureFromSystemCamera();
+    }
+  };
+
+  // ── Image error fallback — shows text placeholder when image fails to load
+  const imageFallback = {
+    onError: () => setCaptured((c) => ({ ...c, uri: c.uri, base64: c.base64 })),
   };
 
   const onAnalyze = () => {
     setShowPreview(false);
-    setCameraReady(false);
     navigation?.navigate?.('scan', {
       imageUri: captured.uri,
       base64: captured.base64,
@@ -194,63 +229,46 @@ const CameraScreen = ({ navigation }) => {
 
   const onRetake = () => {
     setShowPreview(false);
-    if (canStream && cameraReady && cameraRef.current) {
-      captureFromLiveCamera();
+    setQuality(null);
+    if (mode === 'multi') {
+      openImageLibrary();
     } else {
-      captureWithSystemCamera();
+      captureFromSystemCamera();
     }
   };
 
   const shareCamera = async () => {
     try {
-      await Share.share({ message: 'AgriScan AI - Hình ảnh mẫu lá cây', url: captured.uri || 'https://agriscan.ai' });
+      await Share.share({
+        message: 'AgriScan AI - Hình ảnh mẫu lá cây',
+        url: captured.uri || 'https://agriscan.ai',
+      });
     } catch {
       /* no-op */
     }
   };
 
-  // ── Feed area content (live preview / placeholder / captured image) ──
+  // ── Feed area content ──────────────────────────────────────────────
   const renderFeed = () => {
     if (captured.uri) {
       return (
         <Image
           source={{ uri: captured.uri }}
-          style={[styles.feed, facing === Facing.front ? { transform: [{ scaleX: -1 }] } : null]}
-          resizeMode="cover"
-        />
-      );
-    }
-    if (canStream) {
-      return (
-        <CameraView
-          ref={cameraRef}
           style={styles.feed}
-          facing={facing}
-          flash={flashOn ? Flash.on : Flash.off}
-          onCameraReady={() => setCameraReady(true)}
-          onMountError={() => {
-            setCameraError(true);
-            setCameraReady(false);
-          }}
+          resizeMode="cover"
+          onError={(e) => console.warn('Camera feed load error:', e.nativeEvent?.error)}
         />
       );
     }
     return (
-      <View style={[styles.feed, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors['surface-container-low'] }]}>
-        {granted === false ? (
-          <TouchableOpacity
-            onPress={requestPermission}
-            style={{ paddingHorizontal: 20, paddingVertical: 12, backgroundColor: colors.primary, borderRadius: 14 }}>
-            <Text style={{ color: colors['on-primary'], fontWeight: '700' }}>Cấp quyền máy ảnh</Text>
-          </TouchableOpacity>
-        ) : (
-          <>
-            <Icon name="photo_camera" size={36} color={colors.muted} />
-            <Text style={[typography['label-sm'], { color: colors.muted, marginTop: 8 }]}>
-              {cameraError ? 'Máy ảnh không khả dụng, hãy chọn ảnh từ thư viện' : 'Sẵn sàng chụp mẫu lá'}
-            </Text>
-          </>
-        )}
+      <View style={[styles.feed, styles.feedPlaceholder]}>
+        <View style={styles.feedIcon}>
+          <Text style={[typography.body.sm, { color: colors.muted, textAlign: 'center' }]}>
+            {mode === 'multi'
+              ? 'Chọn ảnh từ thư viện'
+              : 'Chụp ảnh lá cây'}
+          </Text>
+        </View>
       </View>
     );
   };
@@ -266,7 +284,7 @@ const CameraScreen = ({ navigation }) => {
 
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 64,
+          paddingTop: topInset + HEADER_HEIGHT,
           paddingBottom: 96,
           paddingHorizontal: spacing.gutter,
           gap: 12,
@@ -280,9 +298,17 @@ const CameraScreen = ({ navigation }) => {
                 <TouchableOpacity
                   key={m.key}
                   activeOpacity={0.8}
-                  onPress={() => setMode(m.key)}
+                  onPress={() => {
+                    setMode(m.key);
+                    setShowPreview(false);
+                    setCaptured(emptyCapture());
+                    setQuality(null);
+                  }}
                   style={[styles.modeTab, active && styles.modeTabActive]}>
-                  <Text style={[typography['label-md'], { color: active ? colors.primary : colors.muted, fontWeight: active ? '700' : '500' }]}>
+                  <Text style={[
+                    typography.body.md,
+                    { color: active ? colors.primary : colors.muted, fontWeight: active ? '600' : '400' },
+                  ]}>
                     {m.label}
                   </Text>
                 </TouchableOpacity>
@@ -295,125 +321,171 @@ const CameraScreen = ({ navigation }) => {
               accessibilityLabel="Bật tắt Flash"
               activeOpacity={0.7}
               onPress={() => setFlashOn((v) => !v)}
-              style={[styles.controlBtn, flashOn && { borderColor: colors.primary }]}>
-              <Icon name={flashOn ? 'flash_on' : 'flash_off'} size={18} color={flashOn ? colors.primary : colors.muted} />
+              style={[styles.controlBtn, flashOn && { borderColor: colors.primary, backgroundColor: colors['primary-subtle'] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name={flashOn ? 'flash_on' : 'flash_off'} size={14} color={flashOn ? colors.primary : colors.muted} style={{ marginRight: 4 }} />
+                <Text style={[typography.body.sm, {
+                  color: flashOn ? colors.primary : colors.muted,
+                  fontWeight: '500',
+                }]}>
+                  Flash
+                </Text>
+              </View>
             </TouchableOpacity>
             <TouchableOpacity
               accessibilityLabel="Lưới căn chỉnh"
               activeOpacity={0.7}
               onPress={() => setGridVisible((v) => !v)}
-              style={[styles.controlBtn, gridVisible && { borderColor: colors.primary }]}>
-              <Icon name="grid_on" size={18} color={gridVisible ? colors.primary : colors.muted} />
+              style={[styles.controlBtn, gridVisible && { borderColor: colors.primary, backgroundColor: colors['primary-subtle'] }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Icon name="grid_on" size={14} color={gridVisible ? colors.primary : colors.muted} style={{ marginRight: 4 }} />
+                <Text style={[typography.body.sm, {
+                  color: gridVisible ? colors.primary : colors.muted,
+                  fontWeight: '500',
+                }]}>
+                  Lưới
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Guidance hint */}
+        {/* Guidance hint — text only */}
         <View style={styles.guidanceBanner}>
-          <Icon name="center_focus_strong" size={15} color={colors.primary} />
-          <Text style={[typography['label-sm'], { color: colors.muted, fontWeight: '500' }]}>
-            Căn chỉnh đốm bệnh hoặc mặt lá vào trung tâm khung ngắm
+          <Text style={[typography.body.sm, { color: colors.muted, fontWeight: '500' }]}>
+            Đặt mẫu lá đủ ánh sáng và chi tiết rõ nét trước khi chụp
           </Text>
         </View>
 
-        {/* Precision Viewfinder */}
+        {/* Feed area — no corner brackets, no viewfinder pill */}
         <View style={styles.viewport}>
           {renderFeed()}
-
-          {/* Rule-of-thirds grid */}
-          {gridVisible ? (
-            <View style={styles.grid} pointerEvents="none">
-              <View style={[styles.gridLine, styles.gridV, { left: '33.3%' }]} />
-              <View style={[styles.gridLine, styles.gridV, { right: '33.3%' }]} />
-              <View style={[styles.gridLine, styles.gridH, { top: '33.3%' }]} />
-              <View style={[styles.gridLine, styles.gridH, { bottom: '33.3%' }]} />
+          {gridVisible && captured.uri && (
+            <View style={styles.gridOverlay} pointerEvents="none">
+              <View style={[styles.gridLine, { left: '33.33%' }]} />
+              <View style={[styles.gridLineV, { top: '33.33%' }]} />
+              <View style={[styles.gridLineV, { top: '66.66%' }]} />
+              <View style={[styles.gridLine, { left: '66.66%' }]} />
             </View>
-          ) : null}
+          )}
+        </View>
 
-          {/* Clean framing corners */}
-          <View style={[styles.corner, styles.cornerTL]} />
-          <View style={[styles.corner, styles.cornerTR]} />
-          <View style={[styles.corner, styles.cornerBL]} />
-          <View style={[styles.corner, styles.cornerBR]} />
+        {/* Shutter & Controls Row — text only, no icons */}
+        <View style={styles.controlsRow}>
+          <TouchableOpacity
+            accessibilityLabel="Chuyển chế độ chụp"
+            activeOpacity={0.8}
+            onPress={() => {
+              setMode(mode === 'single' ? 'multi' : 'single');
+              setShowPreview(false);
+              setCaptured(emptyCapture());
+              setQuality(null);
+            }}
+            style={[styles.sideControlBtn, { backgroundColor: colors['surface-container-low'] }]}>
+            <Text style={[typography.body.sm, {
+              color: colors['on-surface'],
+              fontWeight: '500',
+            }]}>
+              {mode === 'single' ? 'Chuyển thư viện' : 'Chuyển máy ảnh'}
+            </Text>
+          </TouchableOpacity>
 
-          {/* Viewfinder bottom label */}
-          <View style={styles.viewportBottomPill}>
-            <Text style={[typography['label-sm'], { color: colors['on-surface'], fontWeight: '600' }]}>
-              {captured.uri ? 'Đã chụp xong — Sẵn sàng gửi phân tích' : 'Giữ cố định máy ảnh để hình ảnh rõ nét'}
+          <View style={{ alignItems: 'center', gap: 4 }}>
+            <TouchableOpacity
+              accessibilityLabel="Chụp ảnh mẫu lá"
+              activeOpacity={0.88}
+              onPress={takePhoto}
+              style={styles.shutterButton}>
+              <View style={styles.shutterInnerCircle} />
+            </TouchableOpacity>
+            <Text style={[typography.body.sm, { color: colors.muted, fontWeight: '500' }]}>
+              Chụp ảnh
             </Text>
           </View>
-        </View>
-
-        {/* Shutter & Controls Row */}
-        <View style={styles.controlsRow}>
-          <TouchableOpacity accessibilityLabel="Thư viện ảnh" activeOpacity={0.8} onPress={openImageLibrary} style={styles.sideControlBtn}>
-            <Icon name="photo_library" size={22} color={colors['on-surface']} />
-            <Text style={[typography['label-sm'], { color: colors.muted, marginTop: 4 }]}>Thư viện</Text>
-          </TouchableOpacity>
 
           <TouchableOpacity
-            accessibilityLabel="Chụp ảnh"
-            activeOpacity={0.88}
-            onPress={onShutter}
-            style={styles.shutterButton}>
-            <View style={styles.shutterInnerCircle}>
-              <Icon name="photo_camera" size={26} color={colors['on-primary']} />
-            </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity accessibilityLabel="Lật camera" activeOpacity={0.8} onPress={() => setFacing((f) => (f === Facing.back ? Facing.front : Facing.back))} style={styles.sideControlBtn}>
-            <Icon name="flip_camera_ios" size={22} color={colors['on-surface']} />
-            <Text style={[typography['label-sm'], { color: colors.muted, marginTop: 4 }]}>Đổi chiều</Text>
+            accessibilityLabel="Lưới căn chỉnh"
+            activeOpacity={0.7}
+            onPress={() => setGridVisible((v) => !v)}
+            style={[styles.sideControlBtn, {
+              backgroundColor: gridVisible ? colors['primary-subtle'] : colors['surface-container-low'],
+            }]}>
+            <Text style={[typography.body.sm, {
+              color: gridVisible ? colors.primary : colors.muted,
+              fontWeight: gridVisible ? '600' : '400',
+            }]}>
+              Lưỗi {gridVisible ? 'Bật' : 'Tắt'}
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Review strip if photo captured */}
+        {/* Mini review ribbon — text only, no chevron icon */}
         {captured.uri ? (
-          <View style={[styles.miniRibbon, shadowPaper]}>
-            <Image source={{ uri: captured.uri }} style={styles.miniThumbImg} resizeMode="cover" />
+          <View style={[styles.miniRibbon, shadowFlat]}>
+            <Image source={{ uri: captured.uri }} style={styles.miniThumbImg} resizeMode="cover"
+              onError={(e) => console.warn('Camera mini thumb error:', e.nativeEvent?.error)} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[typography['label-md'], { color: colors['on-surface'], fontWeight: '700' }]} numberOfLines={1}>
+              <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]} numberOfLines={1}>
                 {captured.crop}
               </Text>
               <Text style={[typography.body.sm, { color: colors.muted }]}>{captured.time}</Text>
             </View>
             <TouchableOpacity onPress={() => setShowPreview(true)} style={styles.reviewBtn}>
-              <Text style={[typography['label-sm'], { color: colors.primary, fontWeight: '700' }]}>Xem lại</Text>
-              <Icon name="chevron_right" size={14} color={colors.primary} />
+              <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '700' }]}>Xem lại</Text>
             </TouchableOpacity>
           </View>
         ) : null}
       </ScrollView>
 
-      {/* Review bottom sheet */}
+      {/* Preview bottom sheet — text only, includes Image Quality Check */}
       {showPreview ? (
-        <View style={[styles.previewSheet, shadowCard]}>
+        <View style={[styles.previewSheet, shadowFlat]}>
           <View style={styles.previewHandle} />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <Text style={[typography['headline-sm'], { color: colors['on-surface'] }]}>Kiểm tra ảnh mẫu lá</Text>
-            <View style={styles.clarityBadge}>
-              <Text style={[typography['label-sm'], { color: colors.primary, fontWeight: '700' }]}>Chất lượng tốt</Text>
-            </View>
+            <Text style={[typography.headline.sm, { color: colors['on-surface'] }]}>
+              Kiểm tra ảnh mẫu lá
+            </Text>
+            {quality && (
+              <View style={[
+                styles.qualityBadge,
+                { backgroundColor: quality.isGood ? colors['primary-subtle'] : colors['surface-container-low'] },
+              ]}>
+                <Text style={[
+                  typography.body.sm,
+                  { color: quality.isGood ? colors.primary : colors.muted, fontWeight: '700' },
+                ]}>
+                  {quality.message}
+                </Text>
+              </View>
+            )}
           </View>
 
           <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-            <Image source={{ uri: captured.uri }} style={styles.previewThumb} resizeMode="cover" />
+            <Image source={{ uri: captured.uri }} style={styles.previewThumb} resizeMode="cover"
+              onError={(e) => console.warn('Camera preview error:', e.nativeEvent?.error)} />
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[typography['label-md'], { color: colors['on-surface'], fontWeight: '700' }]}>Mẫu bệnh phẩm</Text>
+              <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '700' }]}>
+                Mẫu bệnh phẩm
+              </Text>
               <Text style={[typography.body.sm, { color: colors.muted, marginTop: 2 }]} numberOfLines={2}>
-                Ảnh đủ độ sáng và chi tiết gân lá. Nhấn "Phân tích ngay" để bắt đầu nhận diện.
+                Ảnh đủ độ sáng và chi tiết rõ nét. Nhấn "Phân tích ngay" để bắt đầu nhận diện.
               </Text>
             </View>
           </View>
 
           <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
             <TouchableOpacity activeOpacity={0.88} onPress={onRetake} style={styles.retakeBtn}>
-              <Icon name="refresh" size={18} color={colors['on-surface']} />
-              <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]}>Chụp lại</Text>
+              <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]}>
+                Chụp lại
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity activeOpacity={0.88} onPress={onAnalyze} style={styles.analyzeBtn}>
-              <Icon name="arrow_forward" size={18} color={colors['on-primary']} />
-              <Text style={[typography.body.md, { color: colors['on-primary'], fontWeight: '700' }]}>Phân tích ngay</Text>
+            <TouchableOpacity
+              activeOpacity={0.88}
+              onPress={onAnalyze}
+              style={styles.analyzeBtn}
+              disabled={!quality?.isGood}>
+              <Text style={[typography.body.md, { color: colors['on-primary'], fontWeight: '700' }]}>
+                Phân tích ngay
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -426,28 +498,18 @@ const styles = StyleSheet.create({
   modeSwitcher: {
     flexDirection: 'row',
     backgroundColor: colors['surface-container-low'],
-    borderRadius: 20,
+    borderRadius: 8,
     padding: 3,
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   modeTab: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 7,
+    borderRadius: 6,
   },
   modeTabActive: {
     backgroundColor: colors.paper,
-  },
-  controlBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: colors['surface-container-low'],
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors['outline'],
   },
   guidanceBanner: {
     flexDirection: 'row',
@@ -456,165 +518,157 @@ const styles = StyleSheet.create({
     backgroundColor: colors['surface-container-low'],
     paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   viewport: {
     position: 'relative',
     width: '100%',
     aspectRatio: 4 / 4.6,
-    borderRadius: 18,
+    borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: colors['surface-container-high'],
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   feed: { width: '100%', height: '100%' },
-  grid: { ...StyleSheet.absoluteFillObject },
+  feedPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors['surface-container-low'],
+  },
+  feedIcon: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  gridOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    pointerEvents: 'none',
+  },
   gridLine: {
     position: 'absolute',
-    backgroundColor: 'rgba(20, 20, 20, 0.1)',
+    top: 0, bottom: 0,
+    width: 1,
+    backgroundColor: colors.outline,
+    opacity: 0.3,
   },
-  gridV: { top: 0, bottom: 0, width: 1 },
-  gridH: { left: 0, right: 0, height: 1 },
-  corner: {
+  gridLineV: {
     position: 'absolute',
-    width: 24,
-    height: 24,
-    borderColor: colors['on-surface'],
-    opacity: 0.9,
-  },
-  cornerTL: { top: 16, left: 16, borderTopWidth: 2.5, borderLeftWidth: 2.5, borderTopLeftRadius: 4 },
-  cornerTR: { top: 16, right: 16, borderTopWidth: 2.5, borderRightWidth: 2.5, borderTopRightRadius: 4 },
-  cornerBL: { bottom: 16, left: 16, borderBottomWidth: 2.5, borderLeftWidth: 2.5, borderBottomLeftRadius: 4 },
-  cornerBR: { bottom: 16, right: 16, borderBottomWidth: 2.5, borderRightWidth: 2.5, borderBottomRightRadius: 4 },
-  viewportBottomPill: {
-    position: 'absolute',
-    bottom: 14,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors['outline'],
+    left: 0, right: 0,
+    height: 1,
+    backgroundColor: colors.outline,
+    opacity: 0.3,
   },
   controlsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
-    width: '100%',
-    paddingVertical: 8,
+    justifyContent: 'space-between',
+    marginTop: 12,
   },
   sideControlBtn: {
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 64,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  shutterButton: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.paper,
+  controlBtn: {
+    width: 44,
+    height: 36,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.outline,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 4,
-    borderColor: colors['outline'],
-    shadowColor: '#141414',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
+    backgroundColor: colors.surface,
   },
-  shutterInnerCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+  shutterButton: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: colors.paper,
+  },
+  shutterInnerCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors['on-primary'],
   },
   miniRibbon: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
     backgroundColor: colors.paper,
-    borderRadius: 14,
+    borderRadius: 8,
     padding: 10,
-    borderWidth: 1,
-    borderColor: colors['outline'],
+    marginTop: 8,
   },
   miniThumbImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
+    width: 48,
+    height: 48,
+    borderRadius: 6,
   },
   reviewBtn: {
+    marginLeft: 'auto',
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: colors['primary-fixed'],
+    gap: 4,
   },
   previewSheet: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    backgroundColor: colors.surface,
-    padding: 20,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-    borderColor: colors['outline'],
+    backgroundColor: colors.paper,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    padding: 16,
+    maxHeight: '40%',
   },
   previewHandle: {
-    width: 36,
+    width: 40,
     height: 4,
+    backgroundColor: colors.outline,
     borderRadius: 2,
-    backgroundColor: colors['outline'],
     alignSelf: 'center',
-    marginBottom: 14,
+    marginBottom: 12,
   },
-  clarityBadge: {
-    backgroundColor: colors['primary-fixed'],
+  previewThumb: {
+    width: 72,
+    height: 72,
+    borderRadius: 6,
+  },
+  qualityBadge: {
+    alignSelf: 'center',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors['outline'],
   },
-  previewThumb: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
+  analyzeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
   },
   retakeBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 6,
-    height: 46,
-    borderRadius: 12,
+    gap: 8,
     backgroundColor: colors['surface-container-low'],
-    borderWidth: 1,
-    borderColor: colors['outline'],
-  },
-  analyzeBtn: {
-    flex: 1.3,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    height: 46,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
   },
 });
 

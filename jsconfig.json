@@ -9,6 +9,7 @@
   },
   "include": [
     "index.js",
+    "index.web.js",
     "frontend/App.js",
     "frontend/theme.js",
     "frontend/useFonts.js",
@@ -25,7 +26,9 @@
     "frontend/camera/code.js",
     "frontend/result/code.js",
     "frontend/history/code.js",
-    "frontend/chat/code.js"
+    "frontend/chat/code.js",
+    "frontend/guides/code.js",
+    "frontend/settings/code.js"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "android", "web-build", "TempAgriScan"]
 }

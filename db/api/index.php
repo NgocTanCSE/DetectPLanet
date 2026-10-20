@@ -22,18 +22,20 @@
  * when the AI backend or the database is unavailable the API returns an
  * honest 5xx error and the frontend shows an empty/error state.
  */
-header('Content-Type: application/json; charset=utf-8');
-
-// ── CORS: restrict to configured origins (default: same-origin only) ──
+// ── CORS: allow configured origins (or wildcard if ALLOWED_ORIGINS is empty). ──
 $allowedOrigins = getenv('ALLOWED_ORIGINS') ?: '';
 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-if ($origin !== '' && $allowedOrigins !== '') {
-    foreach (array_map('trim', explode(',', $allowedOrigins)) as $allowed) {
-        if (strtolower($allowed) === strtolower($origin)) {
-            header("Access-Control-Allow-Origin: $origin");
-            header('Vary: Origin');
-            break;
+if ($origin !== '') {
+    if ($allowedOrigins !== '' && $allowedOrigins !== '*') {
+        foreach (array_map('trim', explode(',', $allowedOrigins)) as $allowed) {
+            if (strtolower($allowed) === strtolower($origin)) {
+                header("Access-Control-Allow-Origin: $origin");
+                header('Vary: Origin');
+                break;
+            }
         }
+    } else {
+        header("Access-Control-Allow-Origin: *");
     }
 }
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
@@ -41,12 +43,52 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-W
 header('Access-Control-Max-Age: 86400');
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 
+// Compute routing vars early (needed by the /samples/ image route below).
+$method    = $_SERVER['REQUEST_METHOD'];
+$path      = trim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+$scriptDir = trim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
+if ($scriptDir !== '' && strpos($path, $scriptDir) === 0) {
+    $path = trim(substr($path, strlen($scriptDir)), '/');
+}
+$path     = preg_replace('#^index\.php/?#', '', $path);
+$target   = isset($_GET['route']) ? $_GET['route'] : $path;
+
+// ── GET /samples/<name> — serve placeholder images for sample URLs that the
+// public agriscan.ai domain no longer serves (they returned HTML, causing
+// ERR_BLOCKED_BY_ORB in browsers).  The frontend rewrites
+// agriscan.ai/samples/* → <backend>/samples/<name>. ──
+if ($method === 'GET' && preg_match('#^samples/(.+)$#', $path, $sm)) {
+    $name = basename($sm[1]);
+    $uploadDir = __DIR__ . '/uploads';
+    $realPath  = $uploadDir . '/' . $name;
+    if (is_file($realPath)) {
+        $ext = strtolower(pathinfo($realPath, PATHINFO_EXTENSION));
+        $mime = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg',
+                 'png' => 'image/png', 'gif' => 'image/gif'][$ext] ?? 'application/octet-stream';
+        header("Content-Type: $mime");
+        header('Cache-Control: public, max-age=86400');
+        readfile($realPath);
+        exit;
+    }
+    // Fallback: serve a 280×180 light-green placeholder PNG (pre-generated,
+    // no GD extension required).
+    $ph = $uploadDir . '/ph.png';
+    if (is_file($ph)) {
+        header('Content-Type: image/png');
+        header('Cache-Control: public, max-age=86400');
+        readfile($ph);
+        exit;
+    }
+    http_response_code(404);
+    exit;
+}
+
+header('Content-Type: application/json; charset=utf-8');
+
 
 require __DIR__ . '/config.php';   // $pdo (PDO|null), $AI, $GOOGLE
 mb_internal_encoding('UTF-8');
 
-$method    = $_SERVER['REQUEST_METHOD'];
-$path      = trim(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
 $scriptDir = trim(str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '')), '/');
 if ($scriptDir !== '' && strpos($path, $scriptDir) === 0) {
     $path = trim(substr($path, strlen($scriptDir)), '/');
@@ -58,6 +100,12 @@ function send($data, $code = 200) {
     http_response_code($code);
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT);
     exit;
+}
+
+// ── Root router: this is a SINGLE-root API. Reject the legacy
+//    /detectplanet_api prefixed router with an honest 404. ─────────────
+if (preg_match('#^detectplanet_api(/|$)#i', $target)) {
+    send(['error' => 'not found'], 404);
 }
 function confStr($c) { return ($c === null || $c === '') ? '' : number_format((float) $c, 1); }
 function fmtTime($created) {
@@ -616,7 +664,9 @@ if ($method === 'POST') {
                   || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https' : 'http';
         $imageUri = "$proto://$host/uploads/$filename";
 
-        // Real AI inference (Cloudflare Workers AI). NO demo/mock fallback.
+        // Real AI inference via Cloudflare Workers AI — NO mock/demo fallback.
+        // On any failure we return an honest 503 so the frontend shows an
+        // error state instead of inventing diagnosis data.
         $diag = aiDiagnose('data:image/jpeg;base64,' . $rawBase64);
         if (!$diag['ok']) {
             send(['error'   => 'Dịch vụ AI không phản hồi',
@@ -624,6 +674,7 @@ if ($method === 'POST') {
                  503);
         }
         $pred = $diag['prediction'];
+
 
         $finalCrop      = $pred['crop'];
         $finalCropLabel = $pred['crop_label'];
@@ -808,7 +859,8 @@ if ($method === 'POST') {
         $chat = aiChat($messages);
         if (!$chat['ok']) {
             send(['error'   => 'AI chat service unavailable',
-                  'message' => $chat['error'] ?? 'Dịch vụ AI đang bận, vui lòng thử lại.'], 503);
+                  'message' => $chat['error'] ?? 'Dịch vụ AI đang bận, vui lòng thử lại.'],
+                 503);
         }
 
         send([

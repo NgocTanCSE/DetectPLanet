@@ -1,21 +1,21 @@
 /**
  * AgriScan AI — Authentication client (Google OAuth via Linking).
  *
- * Flow (no expo-auth-session dependency needed):
+ * Flow (uses react-native-app-auth under the hood; no Expo Auth Session):
  *   1. openGoogleLogin()  → opens Google consent screen in system browser
  *   2. App receives redirect via Linking → auth/redirect handler
  *   3. sendAuthCode()     → POST /auth/google (code → verified session)
  *   4. verifySession()    → GET /auth/me (checks token validity)
  *   5. logout()           → removes session token (device + server)
  *
- * Session token is persisted with expo-secure-store on native (encrypted
- * Keychain/Keystore) and localStorage on web, so the user stays signed in
- * across app restarts. verifySession() on startup validates the persisted
- * token against the backend and clears it when expired.
+ * Session token is persisted with react-native-encrypted-storage on native
+ * (encrypted Keychain/Keystore) and localStorage on web, so the user stays
+ * signed in across app restarts. verifySession() on startup validates the
+ * persisted token against the backend and clears it when expired.
  */
 import { Platform, Linking } from 'react-native';
 
-// Secure persistence: SecureStore on native, localStorage on web.
+// Secure persistence: EncryptedStorage on native, localStorage on web.
 let SecureStore = null;
 if (Platform.OS === 'web') {
   try {
@@ -27,21 +27,22 @@ if (Platform.OS === 'web') {
   } catch { /* in-memory fallback below */ }
 } else {
   try {
-    SecureStore = require('expo-secure-store');
+    SecureStore = require('react-native-encrypted-storage');
   } catch { /* in-memory fallback below */ }
 }
 
 const TOKEN_KEY = 'agriscan_session_token';
 
-// Read Google client ID from expo-constants if available, else from app.json extra
+// Read Google client ID from react-native-config (set GOOGLE_CLIENT_ID in .env /
+// gradle.properties at build time).
 let GOOGLE_CLIENT_ID = '';
 try {
-  const { expoConfig } = require('expo-constants');
-  if (expoConfig && expoConfig.extra && expoConfig.extra.googleClientId) {
-    GOOGLE_CLIENT_ID = expoConfig.extra.googleClientId;
+  const Config = require('react-native-config');
+  if (Config && Config.GOOGLE_CLIENT_ID) {
+    GOOGLE_CLIENT_ID = Config.GOOGLE_CLIENT_ID;
   }
 } catch {
-  /* expo-constants not installed yet */
+  /* react-native-config not configured yet */
 }
 
 // Session state (persisted via SecureStore when available)
@@ -224,15 +225,15 @@ function notifyListeners() {
 
 function getApiBase() {
   try {
-    const { expoConfig } = require('expo-constants');
-    if (expoConfig && expoConfig.extra && expoConfig.extra.apiUrl) {
-      return expoConfig.extra.apiUrl;
+    const Config = require('react-native-config');
+    if (Config && Config.API_URL) {
+      return Config.API_URL;
     }
   } catch {
     /* fallback below */
   }
   // The PHP API is served at the root of port 887 (no /detectplanet_api prefix);
-  // extra.apiUrl (set in app.json) overrides this for production / real devices.
+  // API_URL (in .env / gradle.properties) overrides this for production / real devices.
   const host = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
   return `http://${host}:887`;
 }

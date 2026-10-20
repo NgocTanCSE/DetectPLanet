@@ -1,9 +1,8 @@
 /**
- * AgriScan AI — Login Screen
+ * AgriScan AI — Login Screen (Text-Only Logo)
  *
- * Clean, minimalist login screen with the nature-inspired green palette.
- * Forest green (#006c49) as the sole accent, warm earth-tone palette,
- * Geist logo type, soft card for the sign-in flow.
+ * Minimalist login screen. No icon logo — a small green mark + wordmark.
+ * Forest green as the sole accent, clean white surface, charcoal text.
  */
 import React, { useState } from 'react';
 import {
@@ -17,7 +16,6 @@ import {
   Alert,
 } from 'react-native';
 import { colors, typography } from './theme';
-import Icon from './icons';
 import { openGoogleLogin, sendAuthCode } from './auth';
 
 const GOOGLE_LOGO = 'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg';
@@ -45,10 +43,10 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        {/* Brand Logo */}
+        {/* Brand wordmark — green dot + text, no icon */}
         <View style={styles.logoContainer}>
-          <View style={styles.logoCircle}>
-            <Icon name="eco" size={40} color={colors.primary} />
+          <View style={styles.greenMark}>
+            <View style={styles.greenDot} />
           </View>
           <Text style={styles.appName}>
             AgriScan AI
@@ -70,7 +68,8 @@ export default function LoginScreen({ navigation }) {
             <ActivityIndicator color={colors.primary} size="small" />
           ) : (
             <>
-              <Image source={{ uri: GOOGLE_LOGO }} style={styles.googleLogo} resizeMode="contain" />
+              <Image source={{ uri: GOOGLE_LOGO }} style={styles.googleLogo} resizeMode="contain"
+                onError={(e) => console.warn('Google logo load error:', e.nativeEvent?.error)} />
               <Text style={styles.googleBtnText}>Tiếp tục với tài khoản Google</Text>
             </>
           )}
@@ -105,21 +104,26 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 28,
+    gap: 24,
   },
   logoContainer: {
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
   },
-  logoCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 24,
-    backgroundColor: colors['primary-fixed'],
+  greenMark: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: colors['primary-subtle'],
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors['outline'],
+    marginBottom: 4,
+  },
+  greenDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
   },
   appName: {
     color: colors['on-surface'],
@@ -137,13 +141,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
+    gap: 10,
     backgroundColor: colors.paper,
     borderWidth: 1,
-    borderColor: colors['outline'],
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 22,
+    borderColor: colors.outline,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     minWidth: 260,
   },
   googleBtnDisabled: {
@@ -154,7 +158,7 @@ const styles = StyleSheet.create({
     height: 18,
   },
   googleBtnText: {
-    ...typography['body-md'],
+    ...typography.body.md,
     color: colors['on-surface'],
     fontWeight: '500',
     fontFamily: 'PlusJakartaSans-SemiBold',

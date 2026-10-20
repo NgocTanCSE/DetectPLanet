@@ -3,7 +3,7 @@
 # dependencies
 node_modules/
 
-# Expo
+# Expo (removed in RN CLI migration)
 .expo/
 dist/
 web-build/
@@ -17,6 +17,13 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+
+# Web build artifacts
+web/index.bundle
+
+# Playwright test artifacts
+test-results/
+playwright-report/
 
 # Metro
 .metro-health-check*
@@ -42,6 +49,13 @@ workers/ai-worker/.wrangler/
 # typescript
 *.tsbuildinfo
 
-# generated native folders
+# Gradle / Android build artifacts (not source)
+.gradle/
+/build/
+/android/app/build/
+/android/captures/
+/android/.cxx/
+/android/cmake/
+
+# iOS
 /ios
-/android

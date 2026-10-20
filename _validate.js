@@ -139,6 +139,7 @@ const rnStub = {
   },
   Platform: { OS: 'ios', select: (o) => o.ios || o.default || null },
   Dimensions: { get: () => ({ width: 390, height: 844 }) },
+  useWindowDimensions: () => ({ width: 390, height: 844 }),
   Alert: { alert: () => {} },
   Linking: {
     addEventListener: () => {},
@@ -170,27 +171,40 @@ const rnStub = {
 //    Also babel-transform every project .js on the fly so `import`/`export`/JSX
 //    resolve under plain Node.
 // ---------------------------------------------------------------------------
+
+// Stub for react-native-image-picker (replaces expo-image-picker).
+// Returns a result object matching the RNIP v8 result format.
 const imagePickerStub = {
-  requestCameraPermissionsAsync: async () => ({ status: 'granted' }),
-  requestMediaLibraryPermissionsAsync: async () => ({ status: 'granted' }),
-  launchCameraAsync: async () => ({ canceled: false, assets: [{ uri: 'https://agriscan.ai/samples/leaf_a841.jpg', base64: '' }] }),
-  launchImageLibraryAsync: async () => ({ canceled: false, assets: [{ uri: 'https://agriscan.ai/samples/leaf_a841.jpg', base64: '' }] }),
-  MediaTypeOptions: { Images: 'images', Videos: 'videos', LivePhotos: 'livePhotos' },
+  launchCamera: async () => ({
+    didCancel: false,
+    assets: [{ uri: 'https://agriscan.ai/samples/leaf_a841.jpg', base64: '', fileName: 'sample.jpg' }],
+  }),
+  launchImageLibrary: async () => ({
+    didCancel: false,
+    assets: [{ uri: 'https://agriscan.ai/samples/leaf_a841.jpg', base64: '', fileName: 'sample.jpg' }],
+  }),
 };
 
-// Stub for expo-camera (CameraView live preview + permission hook).
-// The harness only checks that CameraScreen renders; it never presses the
-// shutter, so a no-op CameraView and a "granted" permission are sufficient.
-const expoCameraStub = {
-  CameraView: () => null,
-  useCameraPermissions: () => [{ status: 'granted' }, async () => ({ status: 'granted' })],
-  CameraType: { back: 'back', front: 'front' },
-  FlashMode: { off: 'off', on: 'on', auto: 'auto', screen: 'screen' },
+// Stub for react-native-encrypted-storage (replaces expo-secure-store).
+const encryptedStorageStub = {
+  getItem: async () => null,
+  setItem: async () => {},
+  removeItem: async () => {},
 };
 
-const expoCryptoStub = {
-  getRandomBytesAsync: async () => Buffer.alloc(16).fill(0),
-  getRandomBytes: () => Buffer.alloc(16).fill(0),
+// Stub for react-native-config (replaces expo-constants extra.*).
+const configStub = {
+  API_URL: 'http://localhost:887',
+  GOOGLE_CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+  REQUIRE_AUTH: 'false',
+  IMAGE_PICKER_QUALITY: '0.8',
+  IMAGE_PICKER_BASE64: 'true',
+};
+
+// Stub for react-native-device-info (replaces expo-constants nativeApplicationVersion).
+const deviceInfoStub = {
+  getVersion: () => '1.0.0',
+  getBundleId: () => 'com.agriscan.ai',
 };
 
 const svgStub = {
@@ -210,6 +224,9 @@ const safeAreaStub = {
   SafeAreaProvider: ({ children }) => children,
   SafeAreaView: 'SafeAreaView',
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
+  useSafeAreaFrame: () => ({ x: 0, y: 0, width: 390, height: 844 }),
+  initialWindowMetrics: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
+  initialWindowSafeAreaInsets: { top: 0, bottom: 0, left: 0, right: 0 },
   default: { SafeAreaProvider: ({ children }) => children, SafeAreaView: 'SafeAreaView' },
 };
 
@@ -217,9 +234,10 @@ const origLoad = Module._load;
 Module._load = function (request, parent, isMain) {
   if (request === 'react') return reactStub;
   if (request === 'react-native') return rnStub;
-  if (request === 'expo-image-picker') return imagePickerStub;
-  if (request === 'expo-camera') return expoCameraStub;
-  if (request === 'expo-crypto') return expoCryptoStub;
+  if (request === 'react-native-image-picker') return imagePickerStub;
+  if (request === 'react-native-encrypted-storage') return encryptedStorageStub;
+  if (request === 'react-native-config') return configStub;
+  if (request === 'react-native-device-info') return deviceInfoStub;
   if (request === 'react-native-svg') return svgStub;
   if (request === 'react-native-safe-area-context') return safeAreaStub;
   return origLoad.apply(this, arguments);
@@ -229,7 +247,13 @@ const origExtension = Module._extensions['.js'];
 Module._extensions['.js'] = function (module, filename) {
   let src = fs.readFileSync(filename, 'utf8');
 
-  if (filename.includes(path.join('node_modules'))) {
+  // Only babel-transform files that live inside the project root and are not
+  // in a node_modules tree. The local @babel plugins may resolve to a system
+  // prefix (e.g. /usr/share/nodejs/@babel/...) whose path does NOT contain the
+  // substring "node_modules"; transforming those would re-enter babel while it
+  // is still loading the plugin ("Reentrant plugin detected"). Scoping the
+  // transform to project files avoids that cycle.
+  if (filename.includes('node_modules') || !filename.startsWith(ROOT)) {
     return origExtension.call(this, module, filename);
   }
 
@@ -272,6 +296,8 @@ const files = [
   './frontend/camera/code.js',
   './frontend/result/code.js',
   './frontend/history/code.js',
+  './frontend/guides/code.js',
+  './frontend/settings/code.js',
 ];
 
 let loaded = 0;
@@ -298,6 +324,8 @@ const Scan = require('./frontend/scan/code').default;
 const Camera = require('./frontend/camera/code').default;
 const Result = require('./frontend/result/code').default;
 const History = require('./frontend/history/code').default;
+const Guides = require('./frontend/guides/code').default;
+const Settings = require('./frontend/settings/code').default;
 const BottomNav = require('./frontend/BottomNav').default;
 const AppHeader = require('./frontend/AppHeader').default;
 const ProgressCircle = require('./frontend/ProgressCircle').default;
@@ -328,11 +356,13 @@ render('CameraScreen', Camera, { navigation: stubNav });
 render('ResultScreen', Result, { navigation: stubNav });
 render('HistoryScreen', History, { navigation: { screen: 'history', navigate: () => {} } });
 render('BottomNav', BottomNav, { activeTab: 'home', onTabPress: () => {} });
+render('GuidesScreen', Guides, { navigation: stubNav });
+render('SettingsScreen', Settings, { navigation: stubNav });
 render('AppHeader', AppHeader, { title: 'AgriScan AI', subtitle: 'Home', actions: [{ icon: 'close', label: 'x', onPress: () => {} }] });
 render('ProgressCircle', ProgressCircle, { progress: 78, size: 72 });
 render('Icon', Icon, { name: 'home', size: 18 });
 
-const total = 12;
+const total = 14;
 console.log('Render test: ' + loaded + ' passed, ' + (total - loaded) + ' failed');
 console.log(loaded === total ? 'ALL COMPONENTS RENDERED' : 'SOME COMPONENTS FAILED');
 process.exit(process.exitCode || 0);

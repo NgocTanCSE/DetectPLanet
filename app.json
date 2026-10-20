@@ -1,67 +1,12 @@
 {
-  "expo": {
-    "scheme": [
-      "agriscan",
-      "com.agriscan.ai"
-    ],
-    "name": "AgriScan AI",
-    "slug": "agriscan-ai",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.agriscan.ai",
-      "buildNumber": "1",
-      "infoPlist": {
-        "NSCameraUsageDescription": "AgriScan AI cần truy cập camera để chụp ảnh lá cây phân tích bệnh.",
-        "NSPhotoLibraryUsageDescription": "AgriScan AI cần truy cập thư viện ảnh để chọn ảnh lá cây đã chụp trước đó."
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
-      "package": "com.agriscan.ai",
-      "versionCode": 1,
-      "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ]
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "plugins": [
-      "expo-camera",
-      [
-        "expo-image-picker",
-        {
-          "photosPermission": "AgriScan AI cần truy cập thư viện ảnh để chọn ảnh lá cây.",
-          "cameraPermission": "AgriScan AI cần truy cập camera để chụp ảnh lá cây.",
-          "microphonePermission": false
-        }
-      ],
-      "expo-font",
-      "expo-status-bar",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/splash-icon.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
-        }
-      ],
-      "expo-secure-store"
-    ],
-    "extra": {
-      "apiUrl": "http://192.168.2.188:887",
-      "googleClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
-      "imagePickerQuality": 0.8,
-      "imagePickerBase64": true
-    }
+  "name": "AgriScanAI",
+  "displayName": "AgriScan AI",
+  "version": "1.0.0",
+  "_comment_metadata": "Non-Expo metadata preserved for reference; runtime config now via react-native-config + gradle.properties",
+  "metadata": {
+    "apiUrl": "http://192.168.2.188:887",
+    "googleClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+    "imagePickerQuality": 0.8,
+    "imagePickerBase64": true
   }
 }

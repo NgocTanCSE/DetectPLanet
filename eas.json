@@ -2,22 +2,13 @@
   "build": {
     "development": {
       "distribution": "internal",
-      "developmentClient": true,
-      "distributionExpoBaseUrl": "https://api.expo.dev",
       "android": {
         "gradleCommand": ":app:assembleDebug"
-      },
-      "ios": {
-        "simulator": true
       }
     },
     "production": {
-      "distribution": "internal",
       "android": {
         "gradleCommand": ":app:assembleRelease"
-      },
-      "ios": {
-        "simulator": false
       }
     }
   },
@@ -25,13 +16,6 @@
     "production": {
       "android": {
         "track": "internal"
-      },
-      "ios": {
-        "appleId": "your-apple-id@example.com",
-        "ascAppId": "1234567890",
-        "appStoreConnectApiKeyId": "YOUR_API_KEY_ID",
-        "appStoreConnectApiKeyIssuerId": "YOUR_ISSUER_ID",
-        "appStoreConnectApiKeyPrivateKeyPath": "./AuthKey_YOUR_KEY_ID.p8"
       }
     }
   }

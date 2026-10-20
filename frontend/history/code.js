@@ -1,15 +1,17 @@
 /**
- * HistoryScreen — AgriScan AI Scan History
+ * HistoryScreen — AgriScan AI Scan History (Field Log + Scan Stats)
  *
- * Clean, structured field log for agricultural diagnoses. Eliminates
- * decorative cloud badges and emoji swipe hints — minimal green aesthetic.
+ * Clean field-log style list. Search input has no icon prefix.
+ * Filter pills are text-only. The health summary banner is replaced
+ * with a plain text-based statistics block (Scan Stats feature)
+ * instead of the old segmented SVG bar.
  */
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, Image, ScrollView, TouchableOpacity, TextInput, StyleSheet, Linking } from 'react-native';
-import { colors, typography, spacing, shadowPaper } from '../theme';
-import Icon from '../icons';
-import AppHeader from '../AppHeader';
+import { colors, typography, spacing, shadowFlat } from '../theme';
+import AppHeader, { useTopInset, HEADER_HEIGHT } from '../AppHeader';
 import { fetchHistory } from '../api';
+import Icon from '../icons';
 
 const severityMap = {
   danger: { label: 'Nguy hiểm', bg: colors['error-container'], text: colors['on-error-container'] },
@@ -17,20 +19,13 @@ const severityMap = {
   healthy: { label: 'Cây khỏe', bg: colors['primary-fixed'], text: colors.primary },
 };
 
-const FILTER_PILLS = [
-  { key: 'all', label: 'Tất cả' },
-  { key: 'rice', label: 'Lúa' },
-  { key: 'tomato', label: 'Cà chua' },
-  { key: 'fruit', label: 'Cây ăn trái' },
-  { key: 'danger', label: 'Báo động' },
-];
-
 const HistoryRecord = ({ record, onPress }) => {
   const sev = severityMap[record.severity] || severityMap.healthy;
   return (
-    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.record, shadowPaper]}>
+    <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={[styles.record, shadowFlat]}>
       <View style={styles.recordImgWrap}>
-        <Image source={{ uri: record.image }} style={styles.recordImg} resizeMode="cover" />
+        <Image source={{ uri: record.image }} style={styles.recordImg} resizeMode="cover"
+          onError={(e) => console.warn('History image error:', e.nativeEvent?.error)} />
         <View style={styles.recordIdBadge}>
           <Text style={styles.recordIdText}>{record.id}</Text>
         </View>
@@ -38,44 +33,37 @@ const HistoryRecord = ({ record, onPress }) => {
       <View style={{ flex: 1, minWidth: 0, paddingLeft: 10 }}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
           <View style={[styles.severityPill, { backgroundColor: sev.bg }]}>
-            <Text style={[typography['label-sm'], { color: sev.text, fontWeight: '700' }]}>
+            <Text style={[typography.body.sm, { color: sev.text, fontWeight: '700' }]}>
               {sev.label}
             </Text>
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-            <Icon name="verified" size={14} color={colors.primary} />
-            <Text style={[typography['label-md'], { color: colors.primary, fontWeight: '700' }]}>
-              {record.confidence}%
-            </Text>
-          </View>
+          {/* Confidence as text, no verified icon */}
+          <Text style={[typography.body.md, { color: colors.primary, fontWeight: '700' }]}>
+            {record.confidence}%
+          </Text>
         </View>
         <Text
-          style={[typography.body.lg, { color: colors['on-surface'], fontWeight: '600' }]}
+          style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]}
           numberOfLines={1}>
           {record.cropLabel} — {record.title}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-          <Icon name="schedule" size={13} color={colors.muted} />
-          <Text style={[typography.body.sm, { color: colors.muted }]}>{record.time}</Text>
-        </View>
+        {/* Time as text, no schedule icon */}
+        <Text style={[typography.body.sm, { color: colors.muted, marginTop: 2 }]}>
+          {record.time}
+        </Text>
       </View>
+      {/* Chevron icon instead of text › */}
       <Icon name="chevron_right" size={18} color={colors.muted} />
     </TouchableOpacity>
   );
 };
 
-const HealthStat = ({ value, label, color }) => (
-  <View style={styles.healthStat}>
-    <Text style={[typography['metric-confidence'], { color }]}>{value}</Text>
-    <Text style={[typography['label-sm'], { color: colors.muted, marginTop: 3 }]}>{label}</Text>
-  </View>
-);
-
 const HistoryScreen = ({ navigation }) => {
+  const topInset = useTopInset();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [records, setRecords] = useState([]);
-  const [filters, setFilters] = useState([{ key: 'all', label: 'Tất cả', icon: 'apps' }]);
+  const [filters, setFilters] = useState([{ key: 'all', label: 'Tất cả' }]);
 
   useEffect(() => {
     const load = async () => {
@@ -83,7 +71,8 @@ const HistoryScreen = ({ navigation }) => {
         const d = await fetchHistory();
         setRecords(d.records || []);
         if (Array.isArray(d.filters) && d.filters.length > 0) {
-          setFilters(d.filters);
+          // Strip icon property from filters (text-only redesign)
+          setFilters(d.filters.map((f) => ({ key: f.key, label: f.label })));
         }
       } catch {
         /* no backend */
@@ -111,19 +100,9 @@ const HistoryScreen = ({ navigation }) => {
     const danger = records.filter((r) => r.severity === 'danger').length;
     const total = healthy + warning + danger;
     if (total === 0) {
-      return { healthy: 0, warning: 0, danger: 0, segs: [{ flex: 100, color: colors['outline'] }] };
+      return { healthy: 0, warning: 0, danger: 0, total: 0 };
     }
-    const pct = (n) => Math.max(5, Math.round((n / total) * 100));
-    return {
-      healthy,
-      warning,
-      danger,
-      segs: [
-        { flex: pct(healthy), color: colors['status-healthy'] },
-        { flex: pct(warning), color: colors['status-warning'] },
-        { flex: pct(danger), color: colors['status-danger'] },
-      ],
-    };
+    return { healthy, warning, danger, total };
   }, [records]);
 
   return (
@@ -138,14 +117,13 @@ const HistoryScreen = ({ navigation }) => {
 
       <ScrollView
         contentContainerStyle={{
-          paddingTop: 64,
+          paddingTop: topInset + HEADER_HEIGHT,
           paddingBottom: 96,
           paddingHorizontal: spacing.gutter,
           gap: 12,
         }}>
-        {/* Search input */}
+        {/* Search input — no search icon prefix */}
         <View style={styles.searchWrap}>
-          <Icon name="search" size={18} color={colors.muted} style={{ marginLeft: 8 }} />
           <TextInput
             placeholder="Tìm theo cây trồng, tên bệnh hoặc ngày..."
             placeholderTextColor={colors.muted}
@@ -153,14 +131,9 @@ const HistoryScreen = ({ navigation }) => {
             onChangeText={setSearch}
             style={styles.searchInput}
           />
-          {search ? (
-            <TouchableOpacity onPress={() => setSearch('')} style={{ padding: 6 }}>
-              <Icon name="close" size={16} color={colors.muted} />
-            </TouchableOpacity>
-          ) : null}
         </View>
 
-        {/* Filter pills */}
+        {/* Filter pills — text only, no icons */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -173,14 +146,13 @@ const HistoryScreen = ({ navigation }) => {
                 activeOpacity={0.8}
                 onPress={() => setActiveFilter(p.key)}
                 style={[styles.pill, active ? styles.pillActive : styles.pillInactive]}>
-                <Text
-                  style={[
-                    typography['label-md'],
-                    {
-                      color: active ? colors['on-primary'] : colors.muted,
-                      fontWeight: active ? '700' : '500',
-                    },
-                  ]}>
+                <Text style={[
+                  typography.body.md,
+                  {
+                    color: active ? colors['on-primary'] : colors.muted,
+                    fontWeight: active ? '600' : '400',
+                  },
+                ]}>
                   {p.label}
                 </Text>
               </TouchableOpacity>
@@ -190,17 +162,51 @@ const HistoryScreen = ({ navigation }) => {
 
         {/* Summary info banner */}
         <View style={styles.logSummaryRow}>
-          <Text style={[typography['label-sm'], { color: colors.muted }]}>
+          <Text style={[typography.body.sm, { color: colors.muted }]}>
             Hiển thị {filtered.length} trong {records.length} mẫu lá đã quét
           </Text>
         </View>
+
+        {/* Scan Stats Summary (Feature 3) — plain text, no segmented bar */}
+        {records.length > 0 && (
+          <View style={[styles.statsSummary, shadowFlat]}>
+            <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600', marginBottom: 8 }]}>
+              Thống kê 7 ngày qua
+            </Text>
+            <View style={{ gap: 6 }}>
+              <View style={styles.statRow}>
+                <Text style={[typography.body.sm, { color: colors.muted }]}>Tổng số mẫu</Text>
+                <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '700' }]}>
+                  {healthSummary.total}
+                </Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={[typography.body.sm, { color: colors.muted }]}>Cây khỏe</Text>
+                <Text style={[typography.body.md, { color: colors['status-healthy'], fontWeight: '700' }]}>
+                  {healthSummary.healthy}
+                </Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={[typography.body.sm, { color: colors.muted }]}>Cần chú ý</Text>
+                <Text style={[typography.body.md, { color: colors['status-warning'], fontWeight: '700' }]}>
+                  {healthSummary.warning}
+                </Text>
+              </View>
+              <View style={styles.statRow}>
+                <Text style={[typography.body.sm, { color: colors.muted }]}>Báo động</Text>
+                <Text style={[typography.body.md, { color: colors['status-danger'], fontWeight: '700' }]}>
+                  {healthSummary.danger}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* Records list */}
         <View style={{ gap: 10 }}>
           {filtered.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Icon name="search" size={32} color={colors.muted} />
-              <Text style={[typography.body.md, { color: colors.muted, marginTop: 8 }]}>
+              <Text style={[typography.body.sm, { color: colors.muted }]}>
                 Không tìm thấy mẫu quét phù hợp.
               </Text>
             </View>
@@ -213,35 +219,6 @@ const HistoryScreen = ({ navigation }) => {
             />
           ))}
         </View>
-
-        {/* Agricultural health status summary */}
-        <View style={[styles.healthBanner, shadowPaper]}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Icon name="analytics" size={18} color={colors.primary} />
-              <Text style={[typography['headline-sm'], { color: colors['on-surface'] }]}>
-                Tỷ lệ mẫu lá 7 ngày
-              </Text>
-            </View>
-            <View style={styles.summaryTag}>
-              <Text style={[typography['label-sm'], { color: colors.primary, fontWeight: '700' }]}>
-                Tổng kết
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.healthBar}>
-            {healthSummary.segs.map((s, i) => (
-              <View key={i} style={[styles.healthSeg, { flex: s.flex, backgroundColor: s.color }]} />
-            ))}
-          </View>
-
-          <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginTop: 12 }}>
-            <HealthStat value={String(healthSummary.healthy)} label="Mẫu khỏe" color={colors['status-healthy']} />
-            <HealthStat value={String(healthSummary.warning)} label="Cần chú ý" color={colors['status-warning']} />
-            <HealthStat value={String(healthSummary.danger)} label="Báo động" color={colors['status-danger']} />
-          </View>
-        </View>
       </ScrollView>
     </View>
   );
@@ -252,21 +229,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.paper,
-    borderRadius: 12,
-    paddingHorizontal: 8,
+    borderRadius: 8,
+    paddingHorizontal: 12,
     height: 44,
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   searchInput: {
     flex: 1,
     color: colors['on-surface'],
     fontSize: 14,
-    paddingHorizontal: 8,
     fontFamily: 'PlusJakartaSans-Regular',
   },
   pill: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 7,
     borderRadius: 20,
   },
@@ -276,27 +252,39 @@ const styles = StyleSheet.create({
   pillInactive: {
     backgroundColor: colors['surface-container-low'],
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   logSummaryRow: {
     paddingHorizontal: 2,
-    marginTop: 2,
+  },
+  statsSummary: {
+    backgroundColor: colors.paper,
+    borderRadius: 8,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: colors.outline,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 5,
   },
   record: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.paper,
-    borderRadius: 14,
+    borderRadius: 8,
     padding: 10,
     gap: 10,
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
   recordImgWrap: {
     position: 'relative',
     width: 72,
     height: 72,
-    borderRadius: 10,
+    borderRadius: 6,
     overflow: 'hidden',
     backgroundColor: colors['surface-container-low'],
     flexShrink: 0,
@@ -322,39 +310,13 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignSelf: 'flex-start',
   },
-  healthBanner: {
-    backgroundColor: colors.paper,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors['outline'],
-    marginTop: 6,
-  },
-  summaryTag: {
-    backgroundColor: colors['primary-fixed'],
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors['outline'],
-  },
-  healthBar: {
-    flexDirection: 'row',
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-    backgroundColor: colors['surface-container-low'],
-    gap: 2,
-  },
-  healthSeg: { height: '100%', borderRadius: 4 },
-  healthStat: { flex: 1, alignItems: 'center' },
   emptyCard: {
     backgroundColor: colors.paper,
-    borderRadius: 14,
-    padding: 32,
+    borderRadius: 8,
+    padding: 24,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors['outline'],
+    borderColor: colors.outline,
   },
 });
 

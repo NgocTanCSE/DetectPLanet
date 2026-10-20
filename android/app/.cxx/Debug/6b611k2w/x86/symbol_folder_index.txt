@@ -1,0 +1,1 @@
+/home/ngoctan/Downloads/DetectPLanet/android/app/build/intermediates/cxx/Debug/6b611k2w/obj/x86

@@ -1,0 +1,15 @@
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/CMakeFiles/appmodules.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/safeareacontext_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/safeareacontext_autolinked_build/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/rnsvg_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/rnsvg_autolinked_build/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/react_codegen_RNImagePickerSpec.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/RNImagePickerSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/RNCConfigSpec_autolinked_build/CMakeFiles/react_codegen_RNCConfigSpec.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/RNCConfigSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/android/app/.cxx/RelWithDebInfo/194u4710/arm64-v8a/RNCConfigSpec_autolinked_build/CMakeFiles/rebuild_cache.dir

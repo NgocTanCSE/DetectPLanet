@@ -7,7 +7,8 @@
  * empty states instead of crashing on a missing/unconfigured backend.
  *
  * Base URL resolution (see the config block below):
- *   1. `expo.extra.apiUrl` in app.json  -> production / real device / LAN dev.
+ *   1. `react-native-config` (API_URL) — consumed by dotenv.gradle at build time.
+ *      Set API_URL in .env for the backend URL.
  *   2. Dev fallback `http://<host>:887` (Android emulator 10.0.2.2 / localhost).
  *
  * IMPORTANT: the PHP API is served at the ROOT of port 887 — there is NO
@@ -16,40 +17,83 @@
  * `extra.apiUrl` to your dev machine's LAN IP (e.g. http://192.168.1.42:887).
  */
 
-import { Platform } from 'react-native';
-import { emptyReport, emptyScanSession } from './dto';
-import * as mockData from './mockData';
+import { Platform } from "react-native";
+import { emptyReport, emptyScanSession } from "./dto";
 
-// API URL configuration (Expo SDK 57 / unified package versioning):
-//  - Production / real device: set "extra.apiUrl" in app.json to your backend URL,
+// API URL configuration (React Native CLI):
+//  - Production / real device: set API_URL in .env (consumed by react-native-config)
 //    e.g. http://<dev-machine-LAN-IP>:887  (find it with `hostname -I` on Linux).
-//    The try/catch below picks it up automatically via expo-constants.
-//  - Dev fallback (used only when extra.apiUrl is empty):
+//    The code below picks it up automatically via react-native-config.
+//  - Dev fallback (used only when API_URL is empty):
 //        http://10.0.2.2:887    -> Android *emulator* (-> host localhost)
 //        http://localhost:887   -> iOS simulator / web on the host machine.
 //    NOTE: 10.0.2.2 and localhost are NOT reachable from a *physical* phone — set
-//    extra.apiUrl to your LAN IP for on-device testing.
+//    API_URL in .env to your LAN IP for on-device testing.
 //  - The PHP API is served at the ROOT of port 887: the Docker doc-root is
 //    /var/www/html (index.php + .htaccess route every non-static path to the
 //    router), so NO path prefix is used. The old "/detectplanet_api" prefix was
 //    inherited from the project's original name and 404s against this router
 //    (`GET /detectplanet_api/home` -> 404, `GET /home` -> 200). Do NOT re-add it.
 //  - Port 887 is the PHP/Apache web server, NOT 5432 (PostgreSQL).
-const _DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-const _DEV_URL  = `http://${_DEV_HOST}:887`;
+const _DEV_HOST = Platform.OS === "android" ? "10.0.2.2" : "localhost";
+const _DEV_URL = `http://${_DEV_HOST}:887`;
 
 let BASE_URL = _DEV_URL;
 try {
-  const { expoConfig } = require('expo-constants');
-  if (expoConfig && expoConfig.extra && expoConfig.extra.apiUrl) {
-    BASE_URL = expoConfig.extra.apiUrl;
+  const Config = require("react-native-config");
+  if (Config && Config.API_URL) {
+    BASE_URL = Config.API_URL;
   }
 } catch {
-  /* expo-constants not installed yet — using dev default (localhost:887) */
+  /* react-native-config not installed yet — using dev default (localhost:887) */
 }
 
 const DEFAULT_TIMEOUT_MS = 15000;
-const jsonHeaders = { 'Content-Type': 'application/json', Accept: 'application/json' };
+const jsonHeaders = {
+  "Content-Type": "application/json",
+  Accept: "application/json",
+};
+
+/**
+ * Rewrite image/report URLs in API responses so they are reachable from the
+ * current runtime:
+ *  - On web/iOS the backend may return host-relative images pointing at the
+ *    Android emulator alias `10.0.2.2`, which is unreachable there.  We swap
+ *    the host to the platform's dev host.
+ *  - Sample images originally hosted on the public `agriscan.ai/samples/`
+ *    domain are not always served correctly.  We rewrite them through our own
+ *    backend proxy so CORS / ORB issues are avoided.
+ */
+function normalizeImageUrl(url) {
+  if (typeof url !== "string" || url.length === 0) return url;
+  let u = url;
+  // Replace Android-emulator-only host with the host-appropriate value.
+  if (_DEV_HOST === "localhost" && u.includes("10.0.2.2:887")) {
+    u = u.replace(/https?:\/\/10\.0\.2\.2:887/, BASE_URL.split("?")[0].replace(/\/$/, ""));
+  }
+  // Proxy agriscan.ai/samples/* through the local backend so the browser can
+  // fetch them with proper CORS headers.
+  if (u.includes("agriscan.ai/samples/")) {
+    const name = u.split("agriscan.ai/samples/").pop();
+    u = BASE_URL.replace(/\/$/, "") + "/samples/" + name;
+  }
+  return u;
+}
+
+/** Recursively rewrite every `image` (and similar) string field in a response. */
+function normalizeImages(obj) {
+  if (obj === null || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(normalizeImages);
+  const out = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (typeof v === "string" && (k === "image" || k === "avatar" || k.endsWith("_image")) && v.startsWith("http")) {
+      out[k] = normalizeImageUrl(v);
+    } else {
+      out[k] = normalizeImages(v);
+    }
+  }
+  return out;
+}
 
 /**
  * @returns {Promise<any|null>} parsed JSON, or `null` when unreachable / no
@@ -64,7 +108,8 @@ async function request(path, options = {}) {
 
   const timeoutMs = options.timeoutMs || DEFAULT_TIMEOUT_MS;
   const { timeoutMs: _ignored, ...fetchOptions } = options;
-  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const controller =
+    typeof AbortController !== "undefined" ? new AbortController() : null;
   const timer = setTimeout(() => controller?.abort?.(), timeoutMs);
   try {
     // Merge caller-supplied headers (e.g. Authorization) without dropping the
@@ -77,9 +122,9 @@ async function request(path, options = {}) {
     });
     const data = await res.json().catch(() => null);
     if (!res.ok) {
-      return data || { error: `HTTP ${res.status}` };
+      return normalizeImages(data) || { error: `HTTP ${res.status}` };
     }
-    return data;
+    return normalizeImages(data);
   } catch (err) {
     return null;
   } finally {
@@ -90,50 +135,58 @@ async function request(path, options = {}) {
 /* ---- Home ---- */
 /** @returns {Promise<{stats: HealthStat[], recent: RecentScan[], articles: Article[]}>} */
 export async function fetchHome() {
-  // Return mock data instead of calling API
-  return Promise.resolve(mockData.mockHomeData);
+  const json = await request("/home");
+  // Real backend only: degrade to empty state (not mock data) when unreachable.
+  return json && !json.error
+    ? json
+    : { stats: [], recent: [], articles: [] };
 }
 
 /* ---- Scan session (leaf image + AI pipeline steps) ---- */
 /** @returns {Promise<ScanSession>} */
 export async function fetchScanSession() {
-  // Return mock data instead of calling API
-  return Promise.resolve(mockData.mockScanSession);
+  const json = await request("/scan/session");
+  return json && !json.error ? json : emptyScanSession();
 }
 
 /* ---- Latest or specific diagnosis report ---- */
 /** @param {string} [id]
  *  @returns {Promise<ResultReport>} */
-export async function fetchResultReport(id = '') {
-  // Return mock data instead of calling API
-  return Promise.resolve(mockData.mockResultReport);
+export async function fetchResultReport(id = "") {
+  // Always hit the backend for the requested scan so a freshly analyzed result
+  // (scan_XXXX) is reflected on screen. Previously this returned a hard-coded
+  // local sample regardless of `id`, which masked the real /result/{id} path.
+  const json = await request("/result/" + encodeURIComponent(id));
+  return json && !json.error ? json : emptyReport();
 }
 
 /* ---- History ---- */
 /** @returns {Promise<{records: HistoryRecord[], filters: FilterPill[]}>} */
 export async function fetchHistory() {
-  const json = await request('/history');
+  const json = await request("/history");
   return json ? json : { records: [], filters: [] };
 }
 
 /* ---- Guides / help accordion ---- */
 /** @returns {Promise<AccordionItem[]>} */
 export async function fetchGuides() {
-  const json = await request('/guides');
+  const json = await request("/guides");
   return json ? json : [];
 }
 
 /* ---- Mutating actions ---- */
 /** @returns {Promise<{ok: boolean}>} */
 export async function saveRecord(id) {
-  const json = await request(`/history/${encodeURIComponent(id)}/save`, { method: 'POST' });
+  const json = await request(`/history/${encodeURIComponent(id)}/save`, {
+    method: "POST",
+  });
   return json ? json : { ok: true };
 }
 
 /** @returns {Promise<ScanSession>} */
-export async function analyzeImage(imageUri, base64 = '') {
-  const json = await request('/analyze', {
-    method: 'POST',
+export async function analyzeImage(imageUri, base64 = "") {
+  const json = await request("/analyze", {
+    method: "POST",
     body: JSON.stringify({ imageUri, base64 }),
     timeoutMs: 120000, // vision inference can take up to AI_TIMEOUT (90s) server-side
   });
@@ -146,20 +199,20 @@ export async function analyzeImage(imageUri, base64 = '') {
  * @returns {Promise<{token: string, user: {email: string, name: string, avatar: string}}>}
  */
 export async function googleLogin(code) {
-  const json = await request('/auth/google', {
-    method: 'POST',
+  const json = await request("/auth/google", {
+    method: "POST",
     body: JSON.stringify({ code }),
   });
   if (!json || json.error) {
-    throw new Error(json?.error || 'Google login failed');
+    throw new Error(json?.error || "Google login failed");
   }
   return json;
 }
 
 /** @returns {Promise<{user: {email: string, name: string, avatar: string}}|null>} */
 export async function verifySession(token) {
-  const json = await request('/auth/me', {
-    headers: { Authorization: 'Bearer ' + (token || '') },
+  const json = await request("/auth/me", {
+    headers: { Authorization: "Bearer " + (token || "") },
   });
   if (!json || json.error) return null;
   return json;
@@ -171,15 +224,24 @@ export async function verifySession(token) {
  * @returns {Promise<{role: string, content: string}>}
  */
 export async function chatWithAI(messages) {
-  const json = await request('/chat', {
-    method: 'POST',
+  const json = await request("/chat", {
+    method: "POST",
     body: JSON.stringify({ messages }),
     timeoutMs: 90000, // text inference can take up to AI_TIMEOUT (90s) server-side
   });
-  return json && !json.error
-    ? json
-    : { role: 'assistant', content: 'Xin lỗi, tôi không thể trả lời ngay lúc này. Vui lòng thử lại sau.' };
+  // Real AI only — surface the error honestly when the backend is unreachable
+  // or the AI service returns a 503.
+  if (!json || json.error) {
+    return {
+      role: "assistant",
+      content:
+        "Xin lỗi, tôi không thể trả lời ngay lúc này. Vui lòng thử lại sau.",
+    };
+  }
+  return json;
 }
+
+export { normalizeImageUrl };
 
 export default {
   fetchHome,
