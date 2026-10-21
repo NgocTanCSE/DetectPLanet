@@ -1,14 +1,10 @@
 /**
  * AgriScan AI — App entry point (React Native shell)
  *
- * This is the navigation shell. Each HTML screen is converted 1:1 to a
- * `code.js` inside its own flat folder (home/ scan/ camera/ result/ history/)
- * and routed in here by the bottom navigation bar. Shared helpers (theme,
- * icons, AppHeader, BottomNav, ProgressCircle) live as flat modules in
- * frontend/ — App.js is the single entry point that wires them together.
- *
- * Original student-list App.js was replaced by the AgriScan design-system shell
- * per the HTML→JS conversion request.
+ * Navigation shell routes screens from frontend/screens/ and shared
+ * components from frontend/components/. Utilities live in frontend/utils/,
+ * hooks in frontend/hooks/, services in frontend/services/.
+ * App.js is the single entry point that wires them together.
  */
 import React, { useState, Component, useEffect } from "react";
 import {
@@ -82,6 +78,7 @@ import ScanScreen from "./screens/ScanScreen";
 import ResultScreen from "./screens/ResultScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import ChatScreen from "./screens/ChatScreen";
+import AlertScreen from "./screens/AlertScreen";
 
   // Maps a screen key -> the bottom-tab that should appear "active"
   const SCREEN_TO_TAB = {
@@ -92,6 +89,7 @@ import ChatScreen from "./screens/ChatScreen";
     guides: "guides",
     chat: "chat",
     settings: "settings",
+    alerts: "alerts",
   };
 
 // Real screens for the remaining nav tabs (were placeholders before)
@@ -127,7 +125,6 @@ export default function App() {
   // other tabbed routes including scan so the user can navigate away after
   // analysis.
   const hideBottomNav = screen === "camera" || screen === "result";
-
   // ── Android hardware back handler ─────────────────────────────────────
   useEffect(() => {
     const handleBack = () => {
@@ -140,6 +137,7 @@ export default function App() {
           guides: "home",
           chat: "home",
           settings: "home",
+          alerts: "home",
         };
         setParams({});
         setScreen(prevMap[screen] || "home");
@@ -202,6 +200,9 @@ export default function App() {
       break;
     case "chat":
       ActiveScreen = ChatScreen;
+      break;
+    case "alerts":
+      ActiveScreen = AlertScreen;
       break;
     default:
       ActiveScreen = HomeScreen;

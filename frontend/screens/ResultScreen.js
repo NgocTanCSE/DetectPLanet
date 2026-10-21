@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: colors.paper,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.outline,
   },

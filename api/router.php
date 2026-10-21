@@ -12,6 +12,7 @@ require_once __DIR__ . '/controllers/HistoryController.php';
 require_once __DIR__ . '/controllers/GuidesController.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/ChatController.php';
+require_once __DIR__ . '/controllers/AlertController.php';
 
 /**
  * Route an incoming request to the appropriate controller.
@@ -66,6 +67,16 @@ function routeRequest($method, $target) {
             return true;
         }
 
+        if ($target === 'alerts') {
+            (new AlertController())->handle('GET', $target);
+            return true;
+        }
+
+        if ($target === 'user-crop-preferences') {
+            (new AlertController())->handle('GET', $target);
+            return true;
+        }
+
         sendJson(['error' => 'not found'], 404);
         return true;
     }
@@ -74,6 +85,11 @@ function routeRequest($method, $target) {
     if ($method === 'POST') {
         if ($target === 'analyze') {
             (new ScanController())->handle('POST');
+            return true;
+        }
+
+        if ($target === 'user-crop-preferences') {
+            (new AlertController())->handle('POST', $target);
             return true;
         }
 

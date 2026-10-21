@@ -6,7 +6,6 @@
     "start": "react-native start",
     "android": "react-native run-android",
     "android:release": "cd android && ./gradlew assembleRelease",
-    "validate": "node _validate.js",
     "emu": "emulator -avd dtct -no-audio -no-boot-anim",
     "up": "./up.sh",
     "up:build": "./up.sh build",

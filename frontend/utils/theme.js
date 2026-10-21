@@ -1,119 +1,109 @@
 /**
- * AgriScan AI — Premium Utilitarian Minimalism Design System
+ * AgriScan AI — Dark Mode Design System (Online Payment Platform style)
  *
- * Flat, text-first theme for the farmer's diagnostic tool.
- * No decorative icons. No card shadows. Single forest-green accent.
- * Warm off-white canvas with charcoal text, tightened spacing.
- *
- * Color System (collapsed from 50+ keys to 12 core roles):
- *   1. Background   — #faf8ff (warm off-white)
- *   2. Surface      — #ffffff (content cards)
- *   3. Text         — #131b2e (charcoal primary)
- *   4. Muted        — #64748b (secondary text)
- *   5. Outline      — #6c7a71 (borders, single value)
- *   6. Primary      — #006c49 (forest green — sole accent, CTAs, active)
- *   7. On-primary   — #ffffff (text on primary)
- *   8. Primary-subtle — #e8f5e9 (hover/active bg, very light green)
- *   9. Danger       — #b91c1c (alert text)
- *   10. Warning     — #ea580c (alert text)
- *   11. Danger-bg   — #fee2e2 (light red surface)
- *   12. Warning-bg  — #fef3c7 (light amber surface)
+ * Deep blue canvas, dark surface cards, white/light text,
+ * gradient accent accents (blue → purple → pink), rounded cards.
+ * Single source of truth for colors, typography, spacing, radius.
  */
 
 // ---------------------------------------------------------------------------
-// 1. COLOR ROLES — collapsed palette
+// 1. COLOR ROLES — dark palette
 // ---------------------------------------------------------------------------
 export const colors = {
-  // Canvas & surfaces
-  paper: '#faf8ff',
-  background: '#faf8ff',
-  surface: '#ffffff',
+  // Canvas — deep blue gradient background
+  background: '#0f172a',
+  paper: '#0f172a',
+
+  // Surfaces — dark elevated cards
+  surface: '#1e293b',
+  'surface-container': '#1e293b',
+  'surface-container-low': '#162135',
+  'surface-container-high': '#253248',
+  'surface-container-highest': '#2d3f5b',
 
   // Text
-  'on-surface': '#131b2e',
-  'on-surface-variant': '#3c4a42',
+  'on-surface': '#f1f5f9',
+  'on-surface-variant': '#94a3b8',
   muted: '#64748b',
 
-  // Borders & dividers (single value)
-  outline: '#6c7a71',
-  'whisper-border': '#e2e8f0',
+  // Borders & dividers
+  outline: '#334155',
+  'whisper-border': '#1e293b',
 
-  // Primary — forest green (sole accent)
-  primary: '#006c49',
+  // Primary — gradient blue (#3b82f6 → #8b5cf6)
+  primary: '#3b82f6',
+  'primary-gradient': ['#3b82f6', '#8b5cf6'],
+  'primary-gradient-pink': ['#8b5cf6', '#ec4899'],
   'on-primary': '#ffffff',
-  'primary-subtle': '#e8f5e9',
+  'primary-subtle': 'rgba(59, 130, 246, 0.15)',
+  'primary-glow': 'rgba(59, 130, 246, 0.35)',
 
-  // Status (simplified)
+  // Accent purple/pink for charts
+  accentPurple: '#8b5cf6',
+  accentPink: '#ec4899',
+  accentBlue: '#3b82f6',
+
+  // Status
   'status-healthy': '#22c55e',
   'status-warning': '#f59e0b',
   'status-danger': '#ef4444',
-  danger: '#b91c1c',
+  danger: '#ef4444',
   'on-danger': '#ffffff',
-  'danger-bg': '#fee2e2',
+  'danger-bg': 'rgba(239, 68, 68, 0.15)',
   'on-danger-bg': '#991c1c',
-  warning: '#ea580c',
+  warning: '#f59e0b',
   'on-warning': '#ffffff',
-  'warning-bg': '#fef3c7',
+  'warning-bg': 'rgba(245, 158, 11, 0.15)',
   'on-warning-bg': '#92400e',
 
-  // ── Backward-compatible aliases (removed as screens are rewritten) ──
-  // These map old color keys to their closest new-system equivalents so
-  // _validate.js and E2E tests stay green during the transition.
-  'primary-fixed': '#e8f5e9',
-  'primary-fixed-dim': '#e8f5e9',
-  'on-primary-fixed': '#131b2e',
-  'on-primary-fixed-variant': '#006c49',
-  'primary-container': '#006c49',
+  // Backward-compatible aliases
+  'primary-fixed': 'rgba(59, 130, 246, 0.15)',
+  'primary-fixed-dim': 'rgba(59, 130, 246, 0.08)',
+  'on-primary-fixed': '#f1f5f9',
+  'on-primary-fixed-variant': '#3b82f6',
+  'primary-container': '#3b82f6',
   'on-primary-container': '#ffffff',
-  'secondary-container': '#e8f5e9',
-  'on-secondary-container': '#004d3a',
-  'error-container': '#fee2e2',
-  'on-error-container': '#991c1c',
-  'tertiary-container': '#fef3c7',
-  'on-tertiary-container': '#92400e',
-  'surface-container-low': '#e8f5e9',
-  'surface-container': '#e8f5e9',
-  'surface-container-high': '#e8f5e9',
-  'surface-container-highest': '#e8f5e9',
-  'surface-tint': '#006c49',
-  'surface-variant': '#e8f5e9',
+  'secondary-container': '#1e293b',
+  'on-secondary-container': '#f1f5f9',
+  'error-container': 'rgba(239, 68, 68, 0.15)',
+  'on-error-container': '#ef4444',
+  'tertiary-container': 'rgba(236, 72, 153, 0.15)',
+  'on-tertiary-container': '#ec4899',
+  'surface-tint': '#3b82f6',
+  'surface-variant': '#1e293b',
   'inverse-on-surface': '#ffffff',
-  'inverse-primary': '#4ade80',
+  'inverse-primary': '#60a5fa',
   'on-secondary': '#ffffff',
   'on-tertiary': '#ffffff',
-  secondary: '#006c49',
-  tertiary: '#b91c1c',
-  'on-background': '#131b2e',
+  secondary: '#8b5cf6',
+  tertiary: '#ec4899',
+  'on-background': '#f1f5f9',
 };
 
 // ---------------------------------------------------------------------------
-// 2. TYPOGRAPHY — Geist headings + Plus Jakarta Sans body (tightened)
+// 2. TYPOGRAPHY — Geist headings + Plus Jakarta Sans body
 // ---------------------------------------------------------------------------
 export const typography = {
-  // Headings — Geist (slightly less heroic)
   headline: {
-    xl: { fontSize: 28, lineHeight: 34, fontWeight: '600', fontFamily: 'Geist' },
-    lg: { fontSize: 22, lineHeight: 28, fontWeight: '600', fontFamily: 'Geist' },
-    md: { fontSize: 18, lineHeight: 24, fontWeight: '600', fontFamily: 'Geist' },
-    sm: { fontSize: 16, lineHeight: 22, fontWeight: '600', fontFamily: 'Geist' },
+    xl: { fontSize: 32, lineHeight: 38, fontWeight: '700', fontFamily: 'Geist' },
+    lg: { fontSize: 26, lineHeight: 32, fontWeight: '600', fontFamily: 'Geist' },
+    md: { fontSize: 20, lineHeight: 26, fontWeight: '600', fontFamily: 'Geist' },
+    sm: { fontSize: 17, lineHeight: 22, fontWeight: '600', fontFamily: 'Geist' },
   },
-  // Body — Plus Jakarta Sans (tighter line-height, slightly larger for readability)
   body: {
-    lg: { fontSize: 15, lineHeight: 22, fontWeight: '400', fontFamily: 'PlusJakartaSans-Regular' },
+    lg: { fontSize: 16, lineHeight: 22, fontWeight: '400', fontFamily: 'PlusJakartaSans-Regular' },
     md: { fontSize: 14, lineHeight: 20, fontWeight: '400', fontFamily: 'PlusJakartaSans-Regular' },
-    sm: { fontSize: 13, lineHeight: 18, fontWeight: '400', fontFamily: 'PlusJakartaSans-Regular' },
+    sm: { fontSize: 12, lineHeight: 17, fontWeight: '400', fontFamily: 'PlusJakartaSans-Regular' },
   },
-  // Labels — use body with weight, no separate label family
   label: {
     lg: { fontSize: 13, lineHeight: 18, fontWeight: '600', fontFamily: 'PlusJakartaSans-Medium' },
-    md: { fontSize: 12, lineHeight: 16, fontWeight: '600', fontFamily: 'PlusJakartaSans-Medium' },
-    sm: { fontSize: 10, lineHeight: 14, fontWeight: '600', fontFamily: 'PlusJakartaSans-Medium' },
+    md: { fontSize: 11, lineHeight: 15, fontWeight: '600', fontFamily: 'PlusJakartaSans-Medium' },
+    sm: { fontSize: 9, lineHeight: 13, fontWeight: '600', fontFamily: 'PlusJakartaSans-Medium' },
   },
-  // Metrics — bold sans, tabular nums
   'metric-confidence': {
-    fontSize: 24,
-    lineHeight: 28,
-    fontWeight: '600',
+    fontSize: 28,
+    lineHeight: 34,
+    fontWeight: '700',
     fontFamily: 'PlusJakartaSans-Bold',
     fontVariant: ['tabular-nums'],
   },
@@ -131,35 +121,35 @@ export const z = {
 };
 
 // ---------------------------------------------------------------------------
-// 3. SPACING — tightened 4px grid
+// 3. SPACING — 4px grid
 // ---------------------------------------------------------------------------
 const rems = (n) => Math.round(n * 16);
 export const spacing = {
-  gutter: rems(0.75),      // 12 — page margins (down from 16)
-  margin: rems(0.75),      // 12
+  gutter: rems(1),      // 16 — page margins
+  margin: rems(1),      // 16
   'space-xs': rems(0.25),   // 4
-  'space-sm': rems(0.375), // 6  (down from 8)
-  'space-md': rems(0.75),  // 12 (down from 16)
-  'space-lg': rems(1.125), // 18 (down from 24)
-  'space-xl': rems(1.5),   // 24 (down from 32)
+  'space-sm': rems(0.5),    // 8
+  'space-md': rems(0.75),   // 12
+  'space-lg': rems(1),      // 16
+  'space-xl': rems(1.5),    // 24
 };
 
 // ---------------------------------------------------------------------------
-// 4. BORDER RADIUS — flattened
+// 4. BORDER RADIUS — rounded cards (payment style)
 // ---------------------------------------------------------------------------
 export const radius = {
-  sm: 2,
-  DEFAULT: 6,
-  md: 8,
-  lg: 12,
-  xl: 16,
-  '2xl': 16,
-  '3xl': 24,
+  sm: 4,
+  DEFAULT: 8,
+  md: 12,
+  lg: 16,
+  xl: 20,
+  '2xl': 24,
+  '3xl': 28,
   full: 9999,
 };
 
 // ---------------------------------------------------------------------------
-// 5. SHARED STYLES — flat, border-only surfaces
+// 5. SHARED STYLES — dark surfaces, border-only
 // ---------------------------------------------------------------------------
 export const surfaceBg = { backgroundColor: colors.paper };
 export const textOnSurface = { color: colors['on-surface'] };
@@ -174,14 +164,14 @@ export const shadowFlat = {
   shadowRadius: 0,
 };
 
-// Backwards-compatible aliases (screens may still reference these)
+// Backwards-compatible aliases
 export const shadowPaper = shadowFlat;
 export const shadowCard = shadowFlat;
 export const shadowStrong = shadowFlat;
 export const shadowElevated = shadowFlat;
 
-// Surface container aliases (simplified to single subtle green tint)
-export const surfaceContainerLowest = { backgroundColor: colors['primary-subtle'] };
+// Surface container aliases (dark subtle tints)
+export const surfaceContainerLowest = { backgroundColor: colors['surface-container-low'] };
 
 export default {
   colors,

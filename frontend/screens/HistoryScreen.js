@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   record: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.paper,
+    backgroundColor: colors.surface,
     borderRadius: 8,
     padding: 10,
     gap: 10,

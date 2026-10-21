@@ -22,6 +22,7 @@ export const TABS = [
   { key: 'home', label: 'Trang chủ', icon: 'home' },
   { key: 'history', label: 'Lịch sử', icon: 'history' },
   { key: 'scan', label: 'Quét lá', icon: 'qr_code_scanner' },
+  { key: 'alerts', label: 'Cảnh báo', icon: 'warning' },
   { key: 'guides', label: 'Cẩm nang', icon: 'menu_book' },
   { key: 'chat', label: 'Chat AI', icon: 'psychology' },
   { key: 'settings', label: 'Cài đặt', icon: 'settings' },
@@ -54,7 +55,6 @@ const BottomNav = ({ activeTab = 'home', onTabPress = () => {} }) => {
       onTabPress(tab.key);
     }
   };
-
   return (
     <View
       style={[
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.paper,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderColor: colors.outline,
     elevation: 0,

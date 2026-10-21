@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 3,
     borderRadius: 6,
-    backgroundColor: colors.paper,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.outline,
   },
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   statCard: {
     flex: 1,
     borderRadius: 8,
-    backgroundColor: colors.paper,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     gap: 4,
     borderWidth: 1,
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
   scanCard: {
     width: 240,
     borderRadius: 8,
-    backgroundColor: colors.paper,
+    backgroundColor: colors.surface,
     padding: 12,
     gap: 10,
     borderWidth: 1,

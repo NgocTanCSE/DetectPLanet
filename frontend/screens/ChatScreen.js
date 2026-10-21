@@ -86,7 +86,7 @@ export default function ChatScreen({ navigation }) {
     if (msg.role === 'system') return null; // Don't render system messages
 
     const align = isUser ? 'flex-end' : 'flex-start';
-    const bg = isUser ? colors.primary : colors.paper;
+    const bg = isUser ? colors.primary : colors.surface;
     const color = isUser ? colors['on-primary'] : colors['on-surface'];
 
     return (

@@ -190,7 +190,7 @@ for (let i = 0; i < NUM_SCANS; i++) {
 
   scans.push({
     id, cropId: crop.id, crop: crop.slug, cropLabel: crop.name, disease, pathogen, severity,
-    image: 'https://agriscan.ai/samples/leaf_' + id.toLowerCase() + '.jpg',
+    image: '', // không dùng link ảnh ảo; frontend sẽ lấy từ API sau khi upload thực tế
     confidence, recommendation: rec, status_spread: spread, status_stage: stage, status_loss: loss,
     scan_status: scanStatus, is_saved: isSaved,
     // created_at is a raw SQL expr (NOW() - INTERVAL ...) — emitted unquoted.
@@ -262,7 +262,7 @@ for (let i = 0; i < 20; i++) {
   else timeStr = Math.ceil(age / 24) + ' ngày trước';
   articles.push({
     id: 'art-' + pad(i + 2, 3),
-    image: 'https://agriscan.ai/samples/article' + pad((i + 2) % 5, 1) + '.jpg',
+    image: '', // không dùng link ảnh ảo; frontend sẽ lấy từ API sau khi upload thực tế
     label: tpl.label, label_color: tpl.color, time: timeStr,
     title: randItem(ARTICLE_TITLES), action: randItem(articleActions), tag_bg: tpl.bg,
   });
