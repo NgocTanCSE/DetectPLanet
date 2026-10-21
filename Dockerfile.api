@@ -32,16 +32,21 @@ RUN a2enmod rewrite \
 RUN mkdir -p /var/www/html/uploads && chown -R www-data:www-data /var/www/html/uploads
 
 # Copy API source files
-COPY db/api/index.php /var/www/html/index.php
-COPY db/api/config.php /var/www/html/config.php
-COPY db/api/.htaccess /var/www/html/.htaccess
-COPY db/api/uploads/ /var/www/html/uploads/
+COPY api/index.php /var/www/html/index.php
+COPY api/config.php /var/www/html/config.php
+COPY api/.htaccess /var/www/html/.htaccess
+COPY api/routes /var/www/html/routes
+COPY api/controllers /var/www/html/controllers
+COPY api/middleware /var/www/html/middleware
+COPY api/services /var/www/html/services
+COPY api/uploads/ /var/www/html/uploads/
 
 # Set proper permissions on code
 RUN chown -R www-data:www-data /var/www/html/*.php
 
-# Environment variables are injected at runtime via docker-compose
-ARG AI_ENDPOINT=http://ai:8000/predict
+# AI endpoint is empty by default — PHP calls Cloudflare Workers AI directly.
+# If a legacy self-hosted AI worker is used, set AI_ENDPOINT via environment.
+ARG AI_ENDPOINT=""
 ENV AI_ENDPOINT ${AI_ENDPOINT}
 
 EXPOSE 80

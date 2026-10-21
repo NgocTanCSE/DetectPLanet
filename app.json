@@ -4,9 +4,10 @@
   "version": "1.0.0",
   "_comment_metadata": "Non-Expo metadata preserved for reference; runtime config now via react-native-config + gradle.properties",
   "metadata": {
-    "apiUrl": "http://192.168.2.188:887",
+    "apiUrl": "http://localhost:887",
     "googleClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
     "imagePickerQuality": 0.8,
-    "imagePickerBase64": true
+    "imagePickerBase64": true,
+    "requireAuth": true
   }
 }

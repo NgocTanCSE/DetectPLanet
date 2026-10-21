@@ -197,6 +197,8 @@ for (let i = 0; i < NUM_SCANS; i++) {
     created_at: createdAtSQL,
     // carry crop tint onto the scan so child pipeline steps can reuse it.
     iconBg: crop.iconBg, iconColor: crop.iconColor,
+    // Associate seed scans with the seed user (resolved at SQL load time via subquery).
+    userId: "(SELECT id FROM users WHERE google_id = 'seed-dev-001' LIMIT 1)",
   });
 }
 
@@ -321,6 +323,12 @@ push('-- =======================================================================
 push('');
 
 // 1. crops (idempotent, keeps ids 1/2/3 stable)
+push('-- 0. Seed user — so authenticated demo users see seeded scans');
+push("INSERT INTO users (google_id, email, name, avatar) VALUES");
+push("  ('seed-dev-001', 'dev@agriscan.ai', 'Nông dân mẫu', '')");
+push("ON CONFLICT (google_id) DO NOTHING;");
+push('');
+push('');
 push('-- 1. Crops (reference data — ids 1=rice, 2=tomato, 3=fruit are assumed below)');
 push('INSERT INTO crops (slug, name, label, icon) VALUES');
 push("  ('rice', 'Lúa nước', 'Lúa', 'eco'),");
@@ -371,9 +379,9 @@ push('-- 5. Scans (parent table — ' + scans.length + ' rows: ' +
   scans.filter((s) => s.scan_status === 'processing').length + ' processing)');
 emitInsert(
   'scans',
-  ['id', 'crop_id', 'crop', 'crop_label', 'disease', 'pathogen', 'severity', 'image', 'confidence', 'recommendation', 'status_spread', 'status_stage', 'status_loss', 'scan_status', 'is_saved', 'created_at'],
+  ['id', 'crop_id', 'user_id', 'crop', 'crop_label', 'disease', 'pathogen', 'severity', 'image', 'confidence', 'recommendation', 'status_spread', 'status_stage', 'status_loss', 'scan_status', 'is_saved', 'created_at'],
   scans.map((s) => [
-    sqlStr(s.id), String(s.cropId), sqlStr(s.crop), sqlStr(s.cropLabel), sqlStr(s.disease), sqlStr(s.pathogen),
+    sqlStr(s.id), String(s.cropId), s.userId, sqlStr(s.crop), sqlStr(s.cropLabel), sqlStr(s.disease), sqlStr(s.pathogen),
     sqlStr(s.severity), sqlStr(s.image), String(s.confidence.toFixed(2)), sqlStr(s.recommendation),
     sqlStr(s.status_spread), sqlStr(s.status_stage), sqlStr(s.status_loss),
     sqlStr(s.scan_status), String(s.is_saved), s.created_at,

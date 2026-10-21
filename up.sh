@@ -131,8 +131,8 @@ docker compose ps --format "table {{.Name}}\t{{.Status}}\t{{.Ports}}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "🌐  Web Frontend:  http://localhost"
-echo "🔌  PHP API:       http://localhost/detectplanet_api"
-echo "🧠  AI Service:    http://localhost/ai/"
+echo "🔌  PHP API:       http://localhost:887"
+echo "🧠  AI Service:    Cloudflare Workers AI (called via PHP API, not a local endpoint)"
 if [ "$SERVERLESS" = false ]; then
     echo "🗄️   PostgreSQL:   localhost:5432"
 fi

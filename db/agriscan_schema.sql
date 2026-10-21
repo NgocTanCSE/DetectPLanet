@@ -44,10 +44,12 @@ CREATE TABLE IF NOT EXISTS `crops` (
 -- 2. Scans — single source of truth for HistoryRecord + ScanSession + ResultReport.
 --    A scan starts as `processing` (ScanSession) then becomes `done` (ResultReport).
 --    `time` (DTO) is formatted by the API from `created_at` (no redundant column).
+--    `user_id` scopes data to the authenticated user (nullable for shared/public scans).
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS `scans` (
   `id`             VARCHAR(32)    NOT NULL,            -- DTO.id  (e.g. 'A841')
   `crop_id`        TINYINT UNSIGNED DEFAULT NULL,      -- FK -> crops.id
+  `user_id`        INT UNSIGNED DEFAULT NULL,          -- FK -> users.id (NULL = unauthenticated/public)
   `crop`           VARCHAR(32)    NOT NULL DEFAULT '',-- DTO.crop  (filter key, e.g. 'rice')
   `crop_label`     VARCHAR(64)    NOT NULL,            -- DTO.cropLabel (e.g. 'Lúa nước')
   `disease`        VARCHAR(128)   NOT NULL,            -- DTO.title / DTO.disease (e.g. 'Bệnh Đốm Nâu')
@@ -66,7 +68,10 @@ CREATE TABLE IF NOT EXISTS `scans` (
   KEY `idx_scans_crop`      (`crop`),
   KEY `idx_scans_status`    (`scan_status`),
   KEY `idx_scans_created`   (`created_at`),
+  KEY `idx_scans_user`      (`user_id`),
   CONSTRAINT `fk_scans_crop` FOREIGN KEY (`crop_id`) REFERENCES `crops`(`id`)
+    ON DELETE SET NULL,
+  CONSTRAINT `fk_scans_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
     ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -119,6 +124,7 @@ CREATE TABLE IF NOT EXISTS `articles` (
   `title`       VARCHAR(128)  NOT NULL,
   `action`      VARCHAR(32)   NOT NULL DEFAULT '',
   `tag_bg`      VARCHAR(32)   NOT NULL DEFAULT '',
+  `url`         VARCHAR(255)  NOT NULL DEFAULT '',
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -184,11 +190,31 @@ CREATE TABLE IF NOT EXISTS `sessions` (
     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- 10. Audit log — trace hành động quan trọng (save/unsave/analyze/delete)
+CREATE TABLE IF NOT EXISTS `audit_log` (
+  `id`          INT UNSIGNED  NOT NULL AUTO_INCREMENT,
+  `user_id`     INT UNSIGNED  DEFAULT NULL,
+  `action`      VARCHAR(32)   NOT NULL,
+  `target_table` VARCHAR(32) NOT NULL,
+  `target_id`   VARCHAR(64)   NOT NULL,
+  `old_values`  JSON,
+  `new_values`  JSON,
+  `created_at`  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_audit_user`   (`user_id`),
+  KEY `idx_audit_target` (`target_table`, `target_id`),
+  CONSTRAINT `fk_audit_user` FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+    ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ===========================================================================
 -- Optional seed data for local dev / phpMyAdmin preview.
 -- Delete or extend freely — these are example rows, not application mocks.
+-- Seed user (associated with seed scans so authenticated demo users see data)
+INSERT IGNORE INTO `users` (`google_id`,`email`,`name`,`avatar`) VALUES
+  ('seed-dev-001','dev@agriscan.ai','Nông dân mẫu','');
 -- ===========================================================================
 INSERT INTO `crops` (`slug`,`name`,`label`,`icon`) VALUES
   ('rice','Lúa nước','Lúa','eco'),
@@ -196,9 +222,9 @@ INSERT INTO `crops` (`slug`,`name`,`label`,`icon`) VALUES
   ('fruit','Trái cây','Trái cây','apple');
 
 INSERT INTO `scans`
-  (`id`,`crop_id`,`crop`,`crop_label`,`disease`,`pathogen`,`severity`,`image`,`confidence`,`recommendation`,`status_spread`,`status_stage`,`status_loss`,`scan_status`,`is_saved`,`created_at`)
+  (`id`,`crop_id`,`user_id`,`crop`,`crop_label`,`disease`,`pathogen`,`severity`,`image`,`confidence`,`recommendation`,`status_spread`,`status_stage`,`status_loss`,`scan_status`,`is_saved`,`created_at`)
 VALUES
-  ('A841',1,'rice','Lúa nước','Bệnh Đốm Nâu','Bipolaris oryzae (Cochliobolus miyabeanus)',
+  ('A841',1,(SELECT `id` FROM `users` WHERE `google_id`='seed-dev-001' LIMIT 1),'rice','Lúa nước','Bệnh Đốm Nâu','Bipolaris oryzae (Cochliobolus miyabeanus)',
    'danger','https://agriscan.ai/samples/leaf_a841.jpg',96.40,
    'Phun thuốc bảo vệ thực vật + cắt bỏ lá bệnh.',
    'Nhanh','Đẻ nhánh rộ','15 - 25%','done',1,NOW());

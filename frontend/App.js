@@ -11,14 +11,19 @@
  * per the HTML→JS conversion request.
  */
 import React, { useState, Component, useEffect } from "react";
-import { StatusBar, View, Text } from "react-native";
+import {
+  StatusBar,
+  View,
+  Text,
+  BackHandler,
+} from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { colors, typography } from "./theme";
-import BottomNav from "./BottomNav";
-import AppHeader from "./AppHeader";
-import { useFonts } from "./useFonts";
-import { verifySession, onAuthStateChanged } from "./auth";
-import LoginScreen from "./LoginScreen";
+import { colors, typography } from "./utils/theme";
+import BottomNav from "./components/layout/BottomNav";
+import AppHeader from "./components/layout/AppHeader";
+import { useFonts } from "./hooks/useFonts";
+import { verifySession, onAuthStateChanged } from "./services/auth";
+import LoginScreen from "./screens/LoginScreen";
 
 // Splash screen is handled natively via the SplashTheme (android
 // windowBackground drawable + delayed background clear in MainActivity.onCreate).
@@ -71,28 +76,27 @@ class ErrorBoundary extends Component {
 }
 
 // Converted screens (each is the RN port of its HTML `code.html`)
-import HomeScreen from "./home/code";
-import CameraScreen from "./camera/code";
-import ScanScreen from "./scan/code";
-import ResultScreen from "./result/code";
-import HistoryScreen from "./history/code";
-import ChatScreen from "./chat/code";
+import HomeScreen from "./screens/HomeScreen";
+import CameraScreen from "./screens/CameraScreen";
+import ScanScreen from "./screens/ScanScreen";
+import ResultScreen from "./screens/ResultScreen";
+import HistoryScreen from "./screens/HistoryScreen";
+import ChatScreen from "./screens/ChatScreen";
 
-// Maps a screen key -> the bottom-tab that should appear "active"
-const SCREEN_TO_TAB = {
-  home: "home",
-  camera: "scan",
-  scan: "scan",
-  result: "scan",
-  history: "history",
-  guides: "guides",
-  chat: "chat",
-  settings: "settings",
-};
+  // Maps a screen key -> the bottom-tab that should appear "active"
+  const SCREEN_TO_TAB = {
+    home: "home",
+    camera: "scan",
+    scan: "scan",
+    result: "scan",
+    guides: "guides",
+    chat: "chat",
+    settings: "settings",
+  };
 
 // Real screens for the remaining nav tabs (were placeholders before)
-import GuidesScreen from "./guides/code";
-import SettingsScreen from "./settings/code";
+import GuidesScreen from "./screens/GuidesScreen";
+import SettingsScreen from "./screens/SettingsScreen";
 
 // ── Auth gate ───────────────────────────────────────────────────────────
 // The Google OAuth flow is fully implemented (auth.js + LoginScreen +
@@ -117,6 +121,35 @@ export default function App() {
   const [params, setParams] = useState({});
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(!REQUIRE_AUTH);
+
+  // BottomNav is hidden on the full-screen camera flow and on the result
+  // screen (result has its own quick action bar). It stays available on all
+  // other tabbed routes including scan so the user can navigate away after
+  // analysis.
+  const hideBottomNav = screen === "camera" || screen === "result";
+
+  // ── Android hardware back handler ─────────────────────────────────────
+  useEffect(() => {
+    const handleBack = () => {
+      if (screen !== "home") {
+        const prevMap = {
+          camera: "home",
+          scan: "home",
+          result: "home",
+          history: "home",
+          guides: "home",
+          chat: "home",
+          settings: "home",
+        };
+        setParams({});
+        setScreen(prevMap[screen] || "home");
+        return true;
+      }
+      return false;
+    };
+    const subscription = BackHandler.addEventListener("hardwareBackPress", handleBack);
+    return () => subscription.remove();
+  }, [screen]);
 
   // Check persisted session on startup (only when the gate is on)
   useEffect(() => {
@@ -205,16 +238,13 @@ export default function App() {
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <StatusBar barStyle="dark-content" backgroundColor={colors.paper} />
           <ActiveScreen navigation={navigation} route={{ params }} />
-          {/* BottomNav is hidden on the full-screen task flows (camera / scan /
-              chat) so it cannot overlap the camera shutter and the analysis
-              preview sheet's "Phân tích ngay" button, or the chat
-              composer (z-index stacking bug that
-              intercepted taps). It stays available on the tabbed routes.
-              Result is shown because users often want to navigate elsewhere
-              after viewing a diagnosis. */}
-          {screen !== "camera" &&
-          screen !== "scan" &&
-          screen !== "chat" ? (
+          {/* BottomNav is hidden on the full-screen task flows (camera / scan) so it
+              cannot overlap the camera shutter and the analysis preview sheet's
+              "Phân tích ngay" button. It stays available on ALL tabbed routes
+              including chat — previously chat hid the nav bar which caused users
+              to lose navigation context. The chat input row's zIndex (21) is now
+              higher than the BottomNav's (20) so taps are never intercepted. */}
+          {hideBottomNav ? null : (
             <BottomNav
               activeTab={SCREEN_TO_TAB[screen] || "home"}
               onTabPress={(tab) => {
@@ -222,7 +252,7 @@ export default function App() {
                 setScreen(tab);
               }}
             />
-          ) : null}
+          )}
         </SafeAreaView>
       </SafeAreaProvider>
     </ErrorBoundary>

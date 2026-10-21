@@ -84,7 +84,7 @@ services:
     volumes:
       - ./db/api/uploads:/var/www/html/uploads
     depends_on:
-      postgres: { condition: service_healthy, required: true }  # API depends on DB for all routes
+      postgres: { condition: service_healthy, required: false }  # required:false so --scale postgres=0 works for serverless mode (API falls back to no-DB state)
 
 volumes:
   postgres_data:

@@ -7,8 +7,8 @@
  */
 import React from 'react';
 import { View } from 'react-native';
-import Svg, { Path, Circle, Rect, Line, Polyline } from 'react-native-svg';
-import { colors } from './theme';
+import Svg, { Path, Circle, Rect, Line, Polyline, Text as SvgText } from 'react-native-svg';
+import { colors } from './utils/theme';
 
 // Clean 24x24 SVG definitions (strokeWidth 2, round linecap/linejoin by default)
 const ICONS = {
@@ -350,6 +350,32 @@ const ICONS = {
     <>
       <Line x1="22" y1="2" x2="11" y2="13" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       <Path d="M22 2l-5 9 7 4 0-13a1 1 0 0 0-1-1z" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </>
+  ),
+  bug: (c) => (
+    <>
+      <Path d="M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" stroke={c} strokeWidth="2" fill="none" />
+      <Path d="M12 2a4 4 0 0 0-4 4v2c0 2-2 3-2 5s2 3 2 5v3a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2v-3s2-2 2-5-2-3-2-5V6a4 4 0 0 0-4-4z" stroke={c} strokeWidth="2" fill="none" />
+      <Line x1="8" y1="2" x2="8" y2="6" stroke={c} strokeWidth="2" strokeLinecap="round" />
+      <Line x1="16" y1="2" x2="16" y2="6" stroke={c} strokeWidth="2" strokeLinecap="round" />
+      <Line x1="6" y1="10" x2="2" y2="10" stroke={c} strokeWidth="2" strokeLinecap="round" />
+      <Line x1="18" y1="10" x2="22" y2="10" stroke={c} strokeWidth="2" strokeLinecap="round" />
+    </>
+  ),
+  google: (c) => (
+    <>
+      <Circle cx="12" cy="12" r="10" fill="#4285F4" />
+      <SvgText
+        x="12.5"
+        y="16.5"
+        textAnchor="middle"
+        fill="#ffffff"
+        fontSize="12"
+        fontWeight="bold"
+        fontFamily="PlusJakartaSans-SemiBold"
+      >
+        G
+      </SvgText>
     </>
   ),
 };
