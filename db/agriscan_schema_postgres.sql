@@ -509,3 +509,46 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON chat_messages (user_id, created_at);
+
+-- =============================================================================
+-- 21. Admin app — khóa người dùng, báo cáo AI, thông báo hàng loạt
+-- =============================================================================
+ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL;
+
+CREATE INDEX IF NOT EXISTS idx_users_status  ON users (status);
+CREATE INDEX IF NOT EXISTS idx_users_deleted ON users (deleted_at);
+
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS sort_order   SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE guides ADD COLUMN IF NOT EXISTS is_published SMALLINT NOT NULL DEFAULT 1;
+
+CREATE TABLE IF NOT EXISTS admin_reports (
+  id           VARCHAR(32) PRIMARY KEY,
+  title        VARCHAR(255) NOT NULL,
+  period_start DATE        NOT NULL,
+  period_end   DATE        NOT NULL,
+  summary      TEXT        NOT NULL,
+  highlights   JSONB,
+  actions      JSONB,
+  metrics      JSONB,
+  model        VARCHAR(128) NOT NULL DEFAULT '',
+  created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_reports_created ON admin_reports (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS notification_broadcasts (
+  id           VARCHAR(32) PRIMARY KEY,
+  title        VARCHAR(255) NOT NULL,
+  body         TEXT        NOT NULL,
+  type         VARCHAR(32) NOT NULL DEFAULT 'info',
+  target       VARCHAR(16) NOT NULL DEFAULT 'all',
+  target_value VARCHAR(128) NOT NULL DEFAULT '',
+  recipients   INTEGER     NOT NULL DEFAULT 0,
+  created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE notifications ADD COLUMN IF NOT EXISTS broadcast_id VARCHAR(32) NULL;
+CREATE INDEX IF NOT EXISTS idx_notifications_broadcast ON notifications (broadcast_id);

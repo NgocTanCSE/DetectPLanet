@@ -31,6 +31,38 @@ function requireDb() {
 }
 
 /**
+ * Chặn tài khoản bị khóa / xóa mềm. Gọi sau khi biết user id.
+ * Trả 403 và xóa phiên hiện tại (nếu có token) để app đăng nhập lại.
+ */
+function assertUserNotBlocked($pdo, $userId) {
+    if ($userId === null || $userId === '') return;
+    try {
+        $stmt = $pdo->prepare("SELECT status, deleted_at FROM users WHERE id = ?");
+        $stmt->execute([(int) $userId]);
+        $u = $stmt->fetch();
+    } catch (Throwable $e) {
+        return; // DB cũ chưa có cột → bỏ qua, không chặn nhầm.
+    }
+    if (!$u) return;
+
+    $blocked = !empty($u['deleted_at']) || (($u['status'] ?? 'active') === 'suspended');
+    if (!$blocked) return;
+
+    try {
+        $pdo->prepare("DELETE FROM sessions WHERE user_id = ?")->execute([(int) $userId]);
+    } catch (Throwable $e) {
+        // ignore
+    }
+
+    sendJson([
+        'error'   => 'account_suspended',
+        'message' => !empty($u['deleted_at'])
+            ? 'Tài khoản đã bị xóa. Vui lòng liên hệ quản trị viên.'
+            : 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.',
+    ], 403);
+}
+
+/**
  * Extract authenticated user ID from Bearer token.
  * Returns NULL when no/invalid token (dev mode: returns all rows).
  * When REQUIRE_AUTH=true, sends 401 and exits on missing/invalid token.
@@ -57,7 +89,9 @@ function getUserIdFromToken() {
         $dev = $pdo->prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1");
         $dev->execute();
         $devRow = $dev->fetch();
-        return $devRow ? (int) $devRow['id'] : null;
+        if (!$devRow) return null;
+        assertUserNotBlocked($pdo, (int) $devRow['id']);
+        return (int) $devRow['id'];
     }
     $stmt = $pdo->prepare("SELECT user_id FROM sessions WHERE id = ? AND expires_at > NOW() LIMIT 1");
     $stmt->execute([$token]);
@@ -73,8 +107,11 @@ function getUserIdFromToken() {
         $dev = $pdo->prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1");
         $dev->execute();
         $devRow = $dev->fetch();
-        return $devRow ? (int) $devRow['id'] : null;
+        if (!$devRow) return null;
+        assertUserNotBlocked($pdo, (int) $devRow['id']);
+        return (int) $devRow['id'];
     }
+    assertUserNotBlocked($pdo, (int) $row['user_id']);
     return (int) $row['user_id'];
 }
 

@@ -44,7 +44,7 @@ class AuthController {
         }
 
         $stmt = $pdo->prepare("
-            SELECT u.id, u.email, u.name, u.avatar
+            SELECT u.id, u.email, u.name, u.avatar, u.status, u.deleted_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.id = ? AND s.expires_at > NOW()
@@ -55,6 +55,17 @@ class AuthController {
 
         if (!$user) {
             sendJson(['error' => 'Invalid or expired session'], 401);
+            return;
+        }
+
+        if (!empty($user['deleted_at']) || ($user['status'] ?? 'active') === 'suspended') {
+            $pdo->prepare("DELETE FROM sessions WHERE id = ?")->execute([$token]);
+            sendJson([
+                'error'   => 'account_suspended',
+                'message' => !empty($user['deleted_at'])
+                    ? 'Tài khoản đã bị xóa. Vui lòng liên hệ quản trị viên.'
+                    : 'Tài khoản đã bị khóa. Vui lòng liên hệ quản trị viên.',
+            ], 403);
             return;
         }
 
@@ -90,10 +101,15 @@ class AuthController {
         try {
             $session = $this->googleExchange($code, $GOOGLE['redirect_uri']);
         } catch (Exception $e) {
+            $message = $e->getMessage();
+            $suspended = strpos($message, 'ACCOUNT_SUSPENDED:') === 0;
+            if ($suspended) {
+                $message = substr($message, strlen('ACCOUNT_SUSPENDED:'));
+            }
             sendJson([
-                'error'   => 'Google token exchange failed',
-                'message' => $e->getMessage(),
-            ], 502);
+                'error'   => $suspended ? 'account_suspended' : 'Google token exchange failed',
+                'message' => $message,
+            ], $suspended ? 403 : 502);
             return;
         }
 
@@ -273,6 +289,14 @@ class AuthController {
 
         if ($row) {
             $userId = $row['id'];
+
+            $check = $pdo->prepare("SELECT status, deleted_at FROM users WHERE id = ? LIMIT 1");
+            $check->execute([$userId]);
+            $existing = $check->fetch();
+            if ($existing && (!empty($existing['deleted_at']) || ($existing['status'] ?? 'active') === 'suspended')) {
+                throw new Exception('ACCOUNT_SUSPENDED:Tài khoản đã bị khóa hoặc xóa. Vui lòng liên hệ quản trị viên.');
+            }
+
             $stmt = $pdo->prepare("UPDATE users SET email=?, name=?, avatar=?, updated_at=NOW() WHERE id=?");
             $stmt->execute([$email, $name, $avatar, $userId]);
         } else {

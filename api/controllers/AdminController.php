@@ -13,22 +13,11 @@
 require_once __DIR__ . '/../services/database.php';
 require_once __DIR__ . '/../services/schema.php';
 require_once __DIR__ . '/../services/official_feed.php';
+require_once __DIR__ . '/../middleware/admin.php';
 
 class AdminController {
     public function handle($method, $target) {
-        global $pdo;
-        $pdo = requireDb();
-
-        $token = (string) (getenv('ADMIN_TOKEN') ?: '');
-        if ($token === '') {
-            sendJson(['error' => 'not found'], 404);
-        }
-        $given = (string) ($_SERVER['HTTP_X_ADMIN_TOKEN'] ?? '');
-        if ($given === '' || !hash_equals($token, $given)) {
-            sendJson(['error' => 'unauthorized', 'message' => 'Sai hoặc thiếu X-Admin-Token.'], 401);
-        }
-
-        ensureDbSchema($pdo);
+        $pdo = requireAdmin();
 
         if ($method === 'GET' && $target === 'admin/ingest') {
             $this->listIngest($pdo);

@@ -1,0 +1,74 @@
+{
+  "buildFiles": [
+    "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-config/android/build/generated/source/codegen/jni/CMakeLists.txt",
+    "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-safe-area-context/android/src/main/jni/CMakeLists.txt",
+    "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-svg/android/src/main/jni/CMakeLists.txt",
+    "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native/ReactAndroid/cmake-utils/default-app-setup/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/home/ngoctan/Android/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/RelWithDebInfo/3z4n4s3d/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/home/ngoctan/Android/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/RelWithDebInfo/3z4n4s3d/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {
+    "appmodules::@6890427a1f51a3e7e1df": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "appmodules",
+      "output": "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/intermediates/cxx/RelWithDebInfo/3z4n4s3d/obj/x86/libappmodules.so",
+      "runtimeFiles": [
+        "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/intermediates/cxx/RelWithDebInfo/3z4n4s3d/obj/x86/libreact_codegen_safeareacontext.so",
+        "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/intermediates/cxx/RelWithDebInfo/3z4n4s3d/obj/x86/libreact_codegen_rnsvg.so",
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/f3bb8c0980a8632bf0fb9e09ca917a5e/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/be86b31661e0c4256e76b936900e4ccb/transformed/react-android-0.86.3-release/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/be86b31661e0c4256e76b936900e4ccb/transformed/react-android-0.86.3-release/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
+      ]
+    },
+    "react_codegen_RNCConfigSpec::@89f1b79ed4954e2f2cff": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_RNCConfigSpec"
+    },
+    "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_rnsvg",
+      "output": "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/intermediates/cxx/RelWithDebInfo/3z4n4s3d/obj/x86/libreact_codegen_rnsvg.so",
+      "runtimeFiles": [
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/be86b31661e0c4256e76b936900e4ccb/transformed/react-android-0.86.3-release/prefab/modules/reactnative/libs/android.x86/libreactnative.so",
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/be86b31661e0c4256e76b936900e4ccb/transformed/react-android-0.86.3-release/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/f3bb8c0980a8632bf0fb9e09ca917a5e/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so"
+      ]
+    },
+    "react_codegen_safeareacontext::@7984cd80db47aa7b952a": {
+      "toolchain": "toolchain",
+      "abi": "x86",
+      "artifactName": "react_codegen_safeareacontext",
+      "output": "/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/intermediates/cxx/RelWithDebInfo/3z4n4s3d/obj/x86/libreact_codegen_safeareacontext.so",
+      "runtimeFiles": [
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/f3bb8c0980a8632bf0fb9e09ca917a5e/transformed/fbjni-0.7.0/prefab/modules/fbjni/libs/android.x86/libfbjni.so",
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/be86b31661e0c4256e76b936900e4ccb/transformed/react-android-0.86.3-release/prefab/modules/jsi/libs/android.x86/libjsi.so",
+        "/home/ngoctan/.gradle/caches/9.3.1/transforms/be86b31661e0c4256e76b936900e4ccb/transformed/react-android-0.86.3-release/prefab/modules/reactnative/libs/android.x86/libreactnative.so"
+      ]
+    }
+  },
+  "toolchains": {
+    "toolchain": {
+      "cCompilerExecutable": "/home/ngoctan/Android/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/clang.lld",
+      "cppCompilerExecutable": "/home/ngoctan/Android/ndk/27.1.12297006/toolchains/llvm/prebuilt/linux-x86_64/bin/clang++.lld"
+    }
+  },
+  "cFileExtensions": [],
+  "cppFileExtensions": [
+    "cpp"
+  ]
+}

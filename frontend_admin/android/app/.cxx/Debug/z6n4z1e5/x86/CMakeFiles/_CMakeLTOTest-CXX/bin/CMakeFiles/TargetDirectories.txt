@@ -1,0 +1,4 @@
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/foo.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/boo.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/CMakeFiles/_CMakeLTOTest-CXX/bin/CMakeFiles/rebuild_cache.dir

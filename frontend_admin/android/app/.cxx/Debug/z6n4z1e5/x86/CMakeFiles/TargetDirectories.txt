@@ -1,0 +1,12 @@
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/CMakeFiles/appmodules.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/RNCConfigSpec_autolinked_build/CMakeFiles/react_codegen_RNCConfigSpec.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/RNCConfigSpec_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/RNCConfigSpec_autolinked_build/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/safeareacontext_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/safeareacontext_autolinked_build/CMakeFiles/rebuild_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/rnsvg_autolinked_build/CMakeFiles/edit_cache.dir
+/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86/rnsvg_autolinked_build/CMakeFiles/rebuild_cache.dir

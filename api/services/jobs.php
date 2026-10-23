@@ -97,5 +97,12 @@ function jobRegistry() {
             'function' => 'jobAggregateReports',
             'interval' => 3600,
         ],
+        // Báo cáo tuần: chỉ chạy thứ Hai (weekday = 1), cách nhau 7 ngày.
+        'weekly-ai-report' => [
+            'file'     => __DIR__ . '/../jobs/weekly_report.php',
+            'function' => 'jobWeeklyAiReport',
+            'interval' => 7 * 24 * 3600,
+            'weekday'  => 1,
+        ],
     ];
 }

@@ -151,6 +151,49 @@ Cả hai đọc lúc chạy — đổi xong chỉ cần reload Metro (backend c�
 Cần `adb reverse tcp:1887 tcp:1887` (và `tcp:8081` cho Metro); cổng 887 không reverse được
 vì dưới 1024. Nếu Google báo `Error 400: redirect_uri_mismatch`, kiểm tra lại 2 điều này.
 
+## App quản trị (frontend_admin) — **React Native CLI (APK Android riêng)**
+
+Bảng điều khiển nội bộ riêng, **React Native CLI 0.86** (dùng chung DB + API với app người dùng).
+Tên hiển thị: **AgriScan Admin**, package: `com.agriscan.admin`.
+Không có màn đăng nhập: mọi request gửi `X-Admin-Token` từ `EncryptedStorage` (cấu hình qua màn Cài đặt).
+
+```bash
+cd frontend_admin
+npm install
+npm run android            # Cài debug APK + Metro (cổng 8081)
+npm run android:reverse    # adb reverse tcp:8081 tcp:8081
+npm run android:release    # Build APK release (android/app/build/outputs/apk/release/app-release.apk)
+npm run bundle:check       # Validate JS bundle
+```
+
+Màn hình: Dashboard, Nhật ký quét, Người dùng, Cẩm nang, Cảnh báo, Báo cáo cộng đồng,
+Tin chính thức, Thông báo, Báo cáo AI, Lịch sử thao tác, Hệ thống, Cài đặt.
+
+Backend admin (đều cần `X-Admin-Token`, xem `api/middleware/admin.php`):
+
+- `admin/overview|system|audit` — KPI 7/30/90 ngày, health, audit log.
+- `admin/users*` — sửa, **khoá có lý do**, mở khoá, xoá mềm, khôi phục.
+- `admin/guides*`, `admin/alerts*`, `admin/scans*` — CRUD + reorder + xoá mềm/khôi phục.
+- `admin/notifications*` — preview số người nhận, broadcast, thống kê đọc, xoá.
+- `admin/ai/summary|reports*` — tổng hợp bằng Cloudflare Workers AI, lưu kèm `metrics` gốc.
+- Route cũ dùng chung: `admin/ingest*` (duyệt tin chính thức), `admin/reports*` (duyệt báo cáo).
+
+Job `weekly-ai-report` chạy **thứ Hai** qua scheduler (registry `weekday => 1`), tạo báo cáo
+tuần và lưu vào `admin_reports`. Chạy tay:
+
+```bash
+docker exec agriscan-api php /var/www/html/jobs/run.php weekly-ai-report
+```
+
+Lưu ý vận hành:
+
+- Token lưu trong `EncryptedStorage` thiết bị; APK release nhúng token build-time từ `frontend_admin/.env` (đọc qua `react-native-config`).
+- Xoá người dùng là xoá mềm (`deleted_at`, `status='deleted'`), khôi phục được; tài khoản
+  bị khoá/xoá nhận 403 khi gọi API.
+- Sửa PHP phải `docker compose up -d --build api scheduler` (image không bind mount).
+- Emulator: API base mặc định `http://10.0.2.2:887`; máy thật đổi trong Cài đặt → IP LAN máy chủ.
+- Chỉ cài song song app người dùng (`com.agriscan.ai`) — không xung đột.
+
 ## Animation (chuyển trang + phần tử)
 
 Toàn bộ dùng `Animated` có sẵn của React Native — **không** thêm Reanimated /

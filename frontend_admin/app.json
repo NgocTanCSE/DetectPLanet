@@ -1,0 +1,6 @@
+{
+  "_comment": "name MUST match MainActivity.getMainComponentName() in android/app/src/main/java/com/agriscan/admin/MainActivity.kt",
+  "name": "AgriScanAdmin",
+  "displayName": "AgriScan Admin",
+  "version": "1.0.0"
+}

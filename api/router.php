@@ -15,14 +15,65 @@ require_once __DIR__ . '/controllers/ChatController.php';
 require_once __DIR__ . '/controllers/AlertController.php';
 require_once __DIR__ . '/controllers/JobController.php';
 require_once __DIR__ . '/controllers/AdminController.php';
+require_once __DIR__ . '/controllers/AdminOverviewController.php';
+require_once __DIR__ . '/controllers/AdminUsersController.php';
+require_once __DIR__ . '/controllers/AdminGuidesController.php';
+require_once __DIR__ . '/controllers/AdminAlertsController.php';
+require_once __DIR__ . '/controllers/AdminScansController.php';
+require_once __DIR__ . '/controllers/AdminNotificationsController.php';
+require_once __DIR__ . '/controllers/AdminAiController.php';
 require_once __DIR__ . '/controllers/ReportController.php';
 require_once __DIR__ . '/controllers/NotificationsController.php';
+
+/**
+ * Các route của app admin (frontend_admin). Tất cả yêu cầu X-Admin-Token.
+ * Trả true nếu đã xử lý (kể cả 404 của controller).
+ */
+function adminRoute($method, $target) {
+    if (strpos($target, 'admin/') !== 0) return false;
+    // Route admin cũ (duyệt tin chính thức / báo cáo cộng đồng) nằm ở block method bên dưới.
+    if (preg_match('#^admin/(ingest|reports)(/|$)#', $target)) return false;
+
+    if (strpos($target, 'admin/users') === 0) {
+        (new AdminUsersController())->handle($method, $target);
+        return true;
+    }
+    if (strpos($target, 'admin/guides') === 0) {
+        (new AdminGuidesController())->handle($method, $target);
+        return true;
+    }
+    if (strpos($target, 'admin/alerts') === 0) {
+        (new AdminAlertsController())->handle($method, $target);
+        return true;
+    }
+    if (strpos($target, 'admin/scans') === 0) {
+        (new AdminScansController())->handle($method, $target);
+        return true;
+    }
+    if (strpos($target, 'admin/notifications') === 0) {
+        (new AdminNotificationsController())->handle($method, $target);
+        return true;
+    }
+    if (strpos($target, 'admin/ai') === 0) {
+        (new AdminAiController())->handle($method, $target);
+        return true;
+    }
+    if (in_array($target, ['admin/overview', 'admin/system', 'admin/audit'], true)) {
+        (new AdminOverviewController())->handle($method, $target);
+        return true;
+    }
+
+    return false;
+}
 
 /**
  * Route an incoming request to the appropriate controller.
  * Returns true if a route was handled, false otherwise.
  */
 function routeRequest($method, $target) {
+    // Admin app routes — xử lý trước để hỗ trợ GET/POST/PATCH/DELETE.
+    if (adminRoute($method, $target)) return true;
+
     // GET routes
     if ($method === 'GET') {
         if ($target === 'health') {

@@ -72,7 +72,16 @@ const jsonHeaders = {
 function normalizeImageUrl(url) {
   if (typeof url !== "string" || url.length === 0) return url;
   let u = url;
+
   // Replace Android-emulator-only host with the host-appropriate value.
+  // Android emulator: backend returns localhost → rewrite to 10.0.2.2
+  // iOS/web: backend returns 10.0.2.2 → rewrite to localhost
+  if (_DEV_HOST === "10.0.2.2" && /https?:\/\/localhost:887/.test(u)) {
+    u = u.replace(/https?:\/\/localhost:887/, BASE_URL.split("?")[0].replace(/\/$/, ""));
+  }
+  if (_DEV_HOST === "10.0.2.2" && /https?:\/\/127\.0\.0\.1:887/.test(u)) {
+    u = u.replace(/https?:\/\/127\.0\.0\.1:887/, BASE_URL.split("?")[0].replace(/\/$/, ""));
+  }
   if (_DEV_HOST === "localhost" && u.includes("10.0.2.2:887")) {
     u = u.replace(/https?:\/\/10\.0\.2\.2:887/, BASE_URL.split("?")[0].replace(/\/$/, ""));
   }

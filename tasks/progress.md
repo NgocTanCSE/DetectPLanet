@@ -106,3 +106,27 @@ Cập nhật: 2026-10-23 · Kế hoạch: `tasks/plan.md` · Todo: `tasks/todo.m
 | Kết quả | Vòng tròn độ tin cậy đếm 0 → giá trị thật (component riêng, không re-render cả màn) |
 | A11y | `useReduceMotion()` tôn trọng cài đặt giảm chuyển động của hệ điều hành |
 | Sửa kèm | Dedupe filter ở `HistoryScreen` (API trả trùng key → React cảnh báo "same key") |
+
+### App quản trị `frontend_admin` — **React Native CLI APK (23/10)**
+
+| Task | Kết quả | Bằng chứng |
+|---|---|---|
+| A-01 Schema | users status/suspend/delete, guides publish/sort, `admin_reports`, `notification_broadcasts` | `ensureAdminSchema()` + schema SQL mục 21 |
+| A-02 Middleware | `requireAdmin`, phân trang, audit, validate dùng chung | token sai → 401, đúng → 200 |
+| A-03 Overview | KPI 7/30/90, series ngày, phân bố mức độ, top bệnh/cây/tỉnh, activity | `top_provinces` = Nghệ An 118 |
+| A-04 CRUD | users (khoá/mở/xoá mềm/khôi phục), guides + sections + reorder, alerts, scans | curl + UI thật, audit ghi đủ |
+| A-05 Thông báo | preview người nhận, broadcast, thống kê đọc, xoá | gửi 1 tỉnh → 1 người nhận, xoá sạch |
+| A-06 AI | summary + lưu báo cáo + job tuần thứ Hai | `rpt_6156d57472ac382b8939` |
+| A-07 UI | **12 màn RN CLI** (Drawer nav, ScreenTransition), Design token, Animated | Screenshots emulator: Dashboard, Users, Scans, Settings, System |
+| A-08 Test | 62/62 unit/integration PHP | `tests/run.php` |
+| A-09 Docs | `AGENTS.md` + `admin-plan.md` (đã cập nhật RN CLI) | — |
+| A-10 Build APK | `npm run android:release` → `app-release.apk` (21MB, x86_64) | Cài emulator thành công, token build-time OK |
+
+**Kiến trúc mới**: 
+- Dự án RN CLI riêng tại `frontend_admin/` (không dùng Expo)
+- `package.json` riêng, `android/` copy từ app chính, rename `com.agriscan.admin`
+- `react-native-config` + `.env` cho build-time token
+- `EncryptedStorage` cho runtime config (API base + token)
+- Custom drawer navigation + `ScreenTransition` (Animated native driver)
+- Biểu đồ tự vẽ (DayBars, HBar, SeverityBar) — không `recharts`
+- Tất cả 12 màn: Dashboard, Users, Scans, Guides, Alerts, Community, Official, Notifications, AiReports, Audit, System, Settings

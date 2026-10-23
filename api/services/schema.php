@@ -146,6 +146,59 @@ function ensureReportSchema($pdo) {
     );
 }
 
+function ensureAdminSchema($pdo) {
+    // Khóa / xóa mềm người dùng (admin app).
+    $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR(16) NOT NULL DEFAULT 'active'");
+    $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMP NULL");
+    $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS suspended_reason TEXT NOT NULL DEFAULT ''");
+    $pdo->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMP NULL");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_users_status ON users (status)");
+    $pdo->exec("CREATE INDEX IF NOT EXISTS idx_users_deleted ON users (deleted_at)");
+
+    // Cẩm nang: thứ tự + bật/tắt.
+    $pdo->exec("ALTER TABLE guides ADD COLUMN IF NOT EXISTS sort_order SMALLINT NOT NULL DEFAULT 0");
+    $pdo->exec("ALTER TABLE guides ADD COLUMN IF NOT EXISTS is_published SMALLINT NOT NULL DEFAULT 1");
+
+    // Báo cáo do AI tổng hợp, lưu lại để tra cứu.
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS admin_reports (
+           id           VARCHAR(32) PRIMARY KEY,
+           title        VARCHAR(255) NOT NULL,
+           period_start DATE        NOT NULL,
+           period_end   DATE        NOT NULL,
+           summary      TEXT        NOT NULL,
+           highlights   JSONB,
+           actions      JSONB,
+           metrics      JSONB,
+           model        VARCHAR(128) NOT NULL DEFAULT '',
+           created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )"
+    );
+    $pdo->exec(
+        "CREATE INDEX IF NOT EXISTS idx_admin_reports_created
+           ON admin_reports (created_at DESC)"
+    );
+
+    // Mỗi lần gửi thông báo hàng loạt.
+    $pdo->exec(
+        "CREATE TABLE IF NOT EXISTS notification_broadcasts (
+           id           VARCHAR(32) PRIMARY KEY,
+           title        VARCHAR(255) NOT NULL,
+           body         TEXT        NOT NULL,
+           type         VARCHAR(32) NOT NULL DEFAULT 'info',
+           target       VARCHAR(16) NOT NULL DEFAULT 'all',
+           target_value VARCHAR(128) NOT NULL DEFAULT '',
+           recipients   INTEGER     NOT NULL DEFAULT 0,
+           created_at   TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
+         )"
+    );
+    $pdo->exec("ALTER TABLE notifications ADD COLUMN IF NOT EXISTS broadcast_id VARCHAR(32) NULL");
+    $pdo->exec(
+        "CREATE INDEX IF NOT EXISTS idx_notifications_broadcast
+           ON notifications (broadcast_id)"
+    );
+}
+
 function ensureDbSchema($pdo) {
     static $done = false;
     if ($done) return;
@@ -155,6 +208,7 @@ function ensureDbSchema($pdo) {
     ensureJobSchema($pdo);
     ensureOfficialSchema($pdo);
     ensureReportSchema($pdo);
+    ensureAdminSchema($pdo);
 
     $done = true;
 }

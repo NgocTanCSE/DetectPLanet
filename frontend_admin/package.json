@@ -1,0 +1,30 @@
+{
+  "name": "agriscan-admin",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "start": "react-native start --port 8082",
+    "android": "react-native run-android --port 8082",
+    "android:reverse": "adb reverse tcp:8082 tcp:8082",
+    "android:release": "cd android && ./gradlew assembleRelease",
+    "bundle:check": "react-native bundle --platform android --dev false --entry-file index.js --bundle-output /tmp/agriscan-admin.bundle --assets-dest /tmp/agriscan-admin-assets",
+    "validate": "node scripts/validate.js"
+  },
+  "dependencies": {
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-config": "^1.7.2",
+    "react-native-encrypted-storage": "^4.0.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.25.2",
+    "@babel/runtime": "^7.25.0",
+    "@react-native/babel-preset": "0.86.3",
+    "@react-native/metro-config": "0.86.3",
+    "@react-native-community/cli": "20.1.0",
+    "@react-native-community/cli-platform-android": "20.1.0"
+  }
+}

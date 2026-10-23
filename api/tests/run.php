@@ -163,6 +163,45 @@ $extract2 = officialExtract($article2);
 check('bài Sơn La: nhận tỉnh', $extract2['provinces'] === ['Sơn La'], implode(',', $extract2['provinces']));
 check('bài Sơn La: nhận bệnh chổi rồng', ($extract2['pests'][0]['label'] ?? '') === 'Bệnh chổi rồng');
 
+echo "── admin report helpers ──\n";
+require_once __DIR__ . '/../services/admin_report.php';
+
+$json1 = adminExtractJson("```json\n{\"summary\":\"ok\",\"highlights\":[],\"actions\":[]}\n```");
+check('bóc JSON trong fence', is_array($json1) && ($json1['summary'] ?? '') === 'ok');
+$json2 = adminExtractJson('Đây là báo cáo: {"summary":"có dữ liệu","highlights":[{"title":"a"}],"actions":[]} Hết.');
+check('bóc JSON giữa văn bản', is_array($json2) && ($json2['summary'] ?? '') === 'có dữ liệu');
+check('JSON hỏng trả null', adminExtractJson('không có json') === null);
+
+// Test DB (bỏ qua nếu không kết nối được).
+require_once __DIR__ . '/../config.php';
+require_once __DIR__ . '/../services/schema.php';
+if ($pdo) {
+    ensureDbSchema($pdo);
+
+    $from = date('Y-m-d', strtotime('-6 days'));
+    $to = date('Y-m-d');
+    $metrics = adminMetrics($pdo, $from, $to);
+    check('metrics có đủ nhóm', isset($metrics['users'], $metrics['scans'], $metrics['alerts'],
+        $metrics['community'], $metrics['official'], $metrics['notifications']));
+    check('by_day đủ 7 ngày', count($metrics['scans']['by_day']) === 7,
+        'count=' . count($metrics['scans']['by_day']));
+    check('period đúng khoảng', $metrics['period']['from'] === $from && $metrics['period']['to'] === $to);
+
+    $pdo->beginTransaction();
+    $rid = adminSaveReport($pdo, $from, $to, [
+        'summary' => 'Tóm tắt thử nghiệm.',
+        'highlights' => [['title' => 'A', 'detail' => 'B', 'level' => 'info']],
+        'actions' => [['title' => 'C', 'detail' => 'D', 'priority' => 'high']],
+    ], $metrics, 'test-model', 'Báo cáo test');
+    $stmt = $pdo->prepare("SELECT summary, highlights FROM admin_reports WHERE id = ?");
+    $stmt->execute([$rid]);
+    $saved = $stmt->fetch();
+    check('lưu báo cáo AI', (bool) $saved && $saved['summary'] === 'Tóm tắt thử nghiệm.');
+    $hl = $saved ? json_decode($saved['highlights'], true) : null;
+    check('lưu highlights dạng JSON', is_array($hl) && ($hl[0]['title'] ?? '') === 'A');
+    $pdo->rollBack();
+}
+
 echo "\n──────────────────────────────\n";
 printf("%d passed, %d failed\n", $pass, $fail);
 if ($fail > 0) {

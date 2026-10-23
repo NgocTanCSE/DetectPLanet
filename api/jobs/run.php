@@ -67,6 +67,10 @@ if ($cmd === 'help') {
 
 if ($cmd === 'loop') {
     foreach ($registry as $name => $meta) {
+        // Job có lịch cố định (vd báo cáo tuần chỉ chạy thứ Hai).
+        if (isset($meta['weekday']) && (int) date('N') !== (int) $meta['weekday']) {
+            continue;
+        }
         if (!jobIsDue($pdo, $name, (int) $meta['interval'])) {
             continue;
         }

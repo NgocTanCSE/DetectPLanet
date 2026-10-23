@@ -59,3 +59,10 @@ workers/ai-worker/.wrangler/
 
 # iOS
 /ios
+
+# Admin app (React Native) native build output
+/frontend_admin/android/.gradle/
+/frontend_admin/android/build/
+/frontend_admin/android/app/build/
+/frontend_admin/android/.cxx/
+/frontend_admin/android/local.properties
