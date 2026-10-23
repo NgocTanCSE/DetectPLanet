@@ -9,12 +9,13 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { colors, typography, spacing } from '../utils/theme';
-import AppHeader, { useTopInset, HEADER_HEIGHT } from '../components/layout/AppHeader';
+import { BOTTOM_NAV_HEIGHT } from '../components/layout/BottomNav';
 import { fetchGuides } from '../services/api';
-import { SectionHeader, EmptyState, Card } from '../components';
+import { SectionHeader, EmptyState, Card, ScreenHeader } from '../components';
+import { FadeInView } from '../components/motion';
+import { staggerDelay } from '../utils/motion';
 
 const GuidesScreen = ({ navigation }) => {
-  const topInset = useTopInset();
   const [guides, setGuides] = useState([]);
   const [open, setOpen] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -38,16 +39,15 @@ const GuidesScreen = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader
+      <ScreenHeader
         title="Cẩm nang"
-        subtitle="Chẩn đoán & phòng trừ"
-        showBack
+        subtitle="Hướng dẫn nhận biết & xử lý bệnh"
         onBack={() => navigation?.navigate?.('home')}
       />
       <ScrollView
         contentContainerStyle={{
-          paddingTop: topInset + HEADER_HEIGHT,
-          paddingBottom: 96,
+          paddingTop: spacing['space-md'],
+          paddingBottom: BOTTOM_NAV_HEIGHT + spacing['space-xl'],
           paddingHorizontal: spacing.gutter,
           gap: 10,
         }}
@@ -66,65 +66,71 @@ const GuidesScreen = ({ navigation }) => {
           guides.map((item, idx) => {
             const isOpen = open === item.id;
             return (
-              <Card key={item.id} style={styles.accordionCard} padding={0}>
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onPress={() => setOpen(isOpen ? null : item.id)}
-                  style={styles.accordionHeader}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                    <View style={[styles.accordionIcon, { backgroundColor: isOpen ? colors['primary-subtle'] : colors['surface-container-low'] }]}>
-                      <Text style={[typography.body.sm, {
-                        color: isOpen ? colors.primary : colors.muted,
-                        fontWeight: '700',
-                      }]}>
-                        {idx + 1}
-                      </Text>
+              <FadeInView key={item.id} delay={staggerDelay(idx)} translateY={8}>
+                <Card style={styles.accordionCard} padding={0}>
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => setOpen(isOpen ? null : item.id)}
+                    style={styles.accordionHeader}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                      <View style={[styles.accordionIcon, { backgroundColor: isOpen ? colors['primary-subtle'] : colors['surface-container-low'] }]}>
+                        <Text style={[typography.body.sm, {
+                          color: isOpen ? colors.primary : colors.muted,
+                          fontWeight: '700',
+                        }]}>
+                          {idx + 1}
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        <Text style={[typography.body.sm, { color: colors.muted }]} numberOfLines={1}>
+                          {item.subtitle}
+                        </Text>
+                      </View>
                     </View>
-                    <View style={{ flex: 1, minWidth: 0 }}>
-                      <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]} numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                      <Text style={[typography.body.sm, { color: colors.muted }]} numberOfLines={1}>
-                        {item.subtitle}
-                      </Text>
+                    <View style={styles.chevronWrap}>
+                      {/* -45deg turns the left+bottom border corner into a
+                          downward chevron; open state adds 180deg (-> 135deg).
+                          (Inline transform replaces the style transform, so the
+                          base angle must live here, not in styles.chevronIcon.) */}
+                      <View style={[styles.chevronIcon, { transform: [{ rotate: isOpen ? '135deg' : '-45deg' }] }]} />
                     </View>
-                  </View>
-                  <View style={styles.chevronWrap}>
-                    <View style={[styles.chevronIcon, { transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }]} />
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
 
-                {isOpen ? (
-                  <View style={styles.accordionContent}>
-                    {(item.sections || []).map((s, i) => (
-                      <View key={i} style={styles.accordionSection}>
-                        {s.title ? (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                            {s.badge ? (
-                              <View style={styles.sectionBadge}>
-                                <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '700' }]}>
-                                  {s.badge}
-                                </Text>
-                              </View>
-                            ) : null}
-                            <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]}>
-                              {s.title}
+                  {isOpen ? (
+                    <View style={styles.accordionContent}>
+                      {(item.sections || []).map((s, i) => (
+                        <View key={i} style={styles.accordionSection}>
+                          {s.title ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                              {s.badge ? (
+                                <View style={styles.sectionBadge}>
+                                  <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '700' }]}>
+                                    {s.badge}
+                                  </Text>
+                                </View>
+                              ) : null}
+                              <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]}>
+                                {s.title}
+                              </Text>
+                            </View>
+                          ) : null}
+                          <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                            <Text style={[typography.body.sm, { color: colors.primary, marginTop: 2 }]}>
+                              •
+                            </Text>
+                            <Text style={[typography.body.md, { color: colors['on-surface-variant'], flex: 1, lineHeight: 20 }]}>
+                              {s.body}
                             </Text>
                           </View>
-                        ) : null}
-                        <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                          <Text style={[typography.body.sm, { color: colors.primary, marginTop: 2 }]}>
-                            •
-                          </Text>
-                          <Text style={[typography.body.md, { color: colors['on-surface-variant'], flex: 1, lineHeight: 20 }]}>
-                            {s.body}
-                          </Text>
                         </View>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
+                      ))}
+                    </View>
+                  ) : null}
               </Card>
+              </FadeInView>
             );
           })
         )}
@@ -164,7 +170,6 @@ const styles = StyleSheet.create({
     borderStyle: 'solid',
     borderTopWidth: 0,
     borderRightWidth: 0,
-    transform: [{ rotate: '45deg' }],
   },
   accordionContent: {
     paddingHorizontal: 14,

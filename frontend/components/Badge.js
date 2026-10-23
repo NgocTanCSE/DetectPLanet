@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, radius, typography } from '../utils/theme';
+import { colors, radius } from '../utils/theme';
 
 export const Badge = ({
   severity,
@@ -44,14 +44,14 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: radius.sm,
     paddingHorizontal: 8,
-    paddingVertical: 2,
+    paddingVertical: 3,
     alignItems: 'center',
     justifyContent: 'center',
   },
   text: {
     fontSize: 10,
     fontWeight: '700',
-    fontFamily: 'PlusJakartaSans-Medium',
+    fontFamily: 'Inter-SemiBold',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

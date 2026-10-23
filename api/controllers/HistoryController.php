@@ -28,7 +28,7 @@ class HistoryController {
     private function handleGetHistory($scope) {
         global $pdo;
         $records = $pdo->query(
-            "SELECT id, crop, crop_label, disease, confidence, severity, created_at, image
+            "SELECT id, crop, crop_label, disease, confidence, severity, created_at, image, is_saved
              FROM scans WHERE scan_status='done' $scope ORDER BY created_at DESC"
         )->fetchAll();
 

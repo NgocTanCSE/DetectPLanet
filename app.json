@@ -1,11 +1,12 @@
 {
+  "_comment_name": "DO NOT RENAME 'name': it is the AppRegistry component key and MUST match MainActivity.getMainComponentName() in android/app/src/main/java/com/agriscan/ai/MainActivity.kt. Use 'displayName' / res/values/strings.xml (app_name) for the user-visible app name.",
   "name": "AgriScanAI",
-  "displayName": "AgriScan AI",
+  "displayName": "Dự án Ngọc Tân",
   "version": "1.0.0",
   "_comment_metadata": "Non-Expo metadata preserved for reference; runtime config now via react-native-config + gradle.properties",
   "metadata": {
     "apiUrl": "http://localhost:887",
-    "googleClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+    "googleClientId": "861188782661-ecu9981mrno8kmcn84t4lil8j09cl4jd.apps.googleusercontent.com",
     "imagePickerQuality": 0.8,
     "imagePickerBase64": true,
     "requireAuth": true

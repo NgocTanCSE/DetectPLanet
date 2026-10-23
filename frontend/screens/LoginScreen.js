@@ -1,8 +1,8 @@
 /**
- * AgriScan AI — Login Screen (Text-Only Logo)
+ * AgriScan AI — Login Screen (Minimalist)
  *
  * Minimalist login screen. No icon logo — a small green mark + wordmark.
- * Forest green as the sole accent, clean white surface, charcoal text.
+ * Green accent as the sole highlight, clean white surface on white canvas.
  */
 import React, { useState } from 'react';
 import {
@@ -15,9 +15,10 @@ import {
   Alert,
 } from 'react-native';
 import { colors, typography } from '../utils/theme';
-import { openGoogleLogin, sendAuthCode } from '../services/auth';
-import Icon from '../icons';
+import { openGoogleLogin, finishGoogleLogin, googleErrorHint } from '../services/auth';
 import { Button } from '../components';
+
+const isWeb = Platform.OS === 'web';
 
 export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
@@ -25,13 +26,14 @@ export default function LoginScreen({ navigation }) {
   const handleGoogleLogin = async () => {
     setLoading(true);
     try {
-      const code = await openGoogleLogin();
-      await sendAuthCode(code);
+      const result = await openGoogleLogin();
+      await finishGoogleLogin(result);
       navigation.navigate('home');
     } catch (err) {
+      const hint = googleErrorHint(err);
       Alert.alert(
         'Đăng nhập chưa hoàn tất',
-        err.message || 'Không thể đăng nhập bằng Google. Vui lòng thử lại.',
+        (err.message || 'Không thể đăng nhập bằng Google. Vui lòng thử lại.') + (hint ? '\n\n' + hint : ''),
         [{ text: 'Đồng ý' }]
       );
     } finally {
@@ -42,7 +44,7 @@ export default function LoginScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.content}>
-        {/* Brand wordmark — green dot + text, no icon */}
+        {/* Green mark + text */}
         <View style={styles.logoContainer}>
           <View style={styles.greenMark}>
             <View style={styles.greenDot} />
@@ -55,11 +57,11 @@ export default function LoginScreen({ navigation }) {
           </Text>
         </View>
 
-        {/* Google Sign-In Button — clean outline with green accent */}
+        {/* Google Sign-In Button */}
         <Button
           variant="outline"
           iconName="google"
-          iconSize={18}
+          iconSize={22}
           onPress={handleGoogleLogin}
           disabled={loading}
           loading={loading}
@@ -89,79 +91,76 @@ const styles = StyleSheet.create({
     backgroundColor: colors.paper,
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === 'ios' ? 0 : 20,
-    paddingBottom: 32,
+    paddingHorizontal: 28,
+    paddingTop: Platform.OS === 'ios' ? 0 : 32,
+    paddingBottom: 40,
   },
   content: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 24,
+    gap: 28,
   },
   logoContainer: {
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   greenMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
     backgroundColor: colors['primary-subtle'],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   greenDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     backgroundColor: colors.primary,
   },
   appName: {
     color: colors['on-surface'],
     fontWeight: '700',
-    fontSize: 24,
-    lineHeight: 32,
-    fontFamily: 'Geist',
+    fontSize: 28,
+    lineHeight: 34,
+    fontFamily: 'Inter-Bold',
   },
   tagline: {
     color: colors.muted,
     textAlign: 'center',
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    maxWidth: 240,
   },
   googleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.outline,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    minWidth: 260,
-  },
-  googleBtnDisabled: {
-    opacity: 0.6,
-  },
-  googleBtnText: {
-    ...typography.body.md,
-    color: colors['on-surface'],
-    fontWeight: '500',
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    backgroundColor: colors['surface-container-low'],
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    minWidth: 280,
   },
   hint: {
     color: colors.muted,
     textAlign: 'center',
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Inter-Regular',
+    fontSize: 14,
+    lineHeight: 20,
+    maxWidth: 260,
   },
   footer: {
     alignItems: 'center',
   },
   copyright: {
     color: colors.muted,
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Inter-Regular',
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

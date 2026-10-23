@@ -15,12 +15,11 @@ import {
   StyleSheet,
   Share,
 } from 'react-native';
-import { colors, typography, spacing, shadowFlat } from '../utils/theme';
-import AppHeader, { useTopInset, HEADER_HEIGHT } from '../components/layout/AppHeader';
+import { colors, typography, spacing, shadowFlat, radius } from '../utils/theme';
 import ProgressCircle from '../components/layout/ProgressCircle';
 import { emptyScanSession } from '../utils/dto';
 import { fetchScanSession, analyzeImage } from '../services/api';
-import { Card, Badge, Button, SectionHeader, EmptyState } from '../components';
+import { Card, Badge, Button, SectionHeader, EmptyState, ScreenHeader } from '../components';
 
 // Diagnostic pipeline steps — text + number, no sci-fi brackets
 const PIPELINE_STEPS = [
@@ -31,9 +30,10 @@ const PIPELINE_STEPS = [
 ];
 
 const ScanScreen = ({ navigation, route }) => {
-  const topInset = useTopInset();
   const passedImageUri = navigation?.params?.imageUri || route?.params?.imageUri || '';
   const passedBase64 = navigation?.params?.base64 || route?.params?.base64 || '';
+  const passedCrop = navigation?.params?.crop || route?.params?.crop || '';
+  const passedCropLabel = navigation?.params?.cropLabel || route?.params?.cropLabel || '';
 
   const [progress, setProgress] = useState(15);
   const [percentText, setPercentText] = useState('15%');
@@ -47,7 +47,12 @@ const ScanScreen = ({ navigation, route }) => {
     const runAnalysis = async () => {
       try {
         if (passedImageUri || passedBase64) {
-          const res = await analyzeImage(passedImageUri, passedBase64);
+          const res = await analyzeImage(
+            passedImageUri,
+            passedBase64,
+            passedCrop,
+            passedCropLabel,
+          );
           if (!isMounted) return;
           if (res && res.id) {
             setSession(res);
@@ -70,7 +75,7 @@ const ScanScreen = ({ navigation, route }) => {
     };
     runAnalysis();
     return () => { isMounted = false; };
-  }, [passedImageUri, passedBase64]);
+  }, [passedImageUri, passedBase64, passedCrop, passedCropLabel]);
 
   // Smooth realistic progression — chỉ chạy khi có kết quả phân tích
   useEffect(() => {
@@ -110,16 +115,15 @@ const ScanScreen = ({ navigation, route }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader
+      <ScreenHeader
         title="Đang phân tích"
-        showBack
+        subtitle={analysisDone ? 'Đã hoàn tất' : 'AI đang đối chiếu dữ liệu'}
         onBack={onBack}
-        actions={[{ icon: 'share', label: 'Chia sẻ', onPress: shareLeaf }]}
       />
 
       <ScrollView
         contentContainerStyle={{
-          paddingTop: topInset + HEADER_HEIGHT,
+          paddingTop: spacing['space-lg'],
           paddingBottom: 96,
           paddingHorizontal: spacing.gutter,
           gap: spacing['space-md'],
@@ -176,7 +180,7 @@ const ScanScreen = ({ navigation, route }) => {
               <View key={d.id} style={[styles.bBox, {
                 top: d.top, left: d.left,
                 borderColor: c,
-                backgroundColor: 'rgba(0, 108, 73, 0.15)',
+                backgroundColor: colors['primary-subtle'],
               }]}>
                 <Text style={[typography.label.sm, {
                   fontSize: 10,
@@ -315,15 +319,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.outline,
   },
   errorBanner: {
     borderRadius: 8,
     padding: spacing['space-md'],
     gap: 8,
-    borderWidth: 1,
-    borderColor: colors.outline,
     backgroundColor: colors['error-container'],
   },
   errorBtn: {

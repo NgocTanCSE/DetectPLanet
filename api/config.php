@@ -68,7 +68,7 @@ try {
  * Env vars (set these on your hosting platform / docker-compose .env):
  *   CLOUDFLARE_ACCOUNT_ID  Cloudflare account ID
  *   CLOUDFLARE_API_TOKEN   Cloudflare API token with Workers AI Edit permission
- *   CLOUDFLARE_VISION_MODEL  vision model id (default @cf/meta/llama-3.2-11b-vision-instruct)
+ *   CLOUDFLARE_VISION_MODEL  vision model id (default @cf/meta/llama-4-scout-17b-16e-instruct)
  *   CLOUDFLARE_CHAT_MODEL    chat model id   (default @cf/meta/llama-3.1-8b-instruct-fp8)
  *   AI_TIMEOUT             (optional) seconds to wait per inference, default 90
  *
@@ -78,12 +78,13 @@ try {
 $AI = [
     'account_id'      => getenv('CLOUDFLARE_ACCOUNT_ID') ?: '',
     'api_token'       => getenv('CLOUDFLARE_API_TOKEN') ?: getenv('AI_BEARER') ?: '',
-    'vision_model'    => getenv('CLOUDFLARE_VISION_MODEL') ?: '@cf/meta/llama-3.2-11b-vision-instruct',
-    'chat_model'      => getenv('CLOUDFLARE_CHAT_MODEL')   ?: '@cf/meta/llama-3.1-8b-instruct-fp8',
+    'vision_model'    => getenv('CLOUDFLARE_VISION_MODEL') ?: '@cf/meta/llama-4-scout-17b-16e-instruct',
+    // Used when the primary model is unavailable (e.g. a paid multimodal
+    // model while the account is still on the Workers Free plan).
+    'vision_fallback' => getenv('CLOUDFLARE_VISION_FALLBACK') ?: '@cf/meta/llama-4-scout-17b-16e-instruct',
+    'chat_model'      => getenv('CLOUDFLARE_CHAT_MODEL')   ?: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
     'endpoint'        => getenv('AI_ENDPOINT') ?: '',     // legacy full-URL override (/predict)
     'chat_endpoint'   => getenv('CHAT_ENDPOINT') ?: '',   // legacy full-URL override (/chat)
-    'username'        => getenv('AI_USERNAME') ?: '',
-    'api_key'         => getenv('AI_API_KEY') ?: '',
     'bearer'          => getenv('AI_BEARER') ?: getenv('CLOUDFLARE_API_TOKEN') ?: '',
     'timeout'         => (int) (getenv('AI_TIMEOUT') ?: 90),
 ];
@@ -92,9 +93,12 @@ $AI = [
  * Google OAuth configuration — set these from your Google Cloud Console.
  *   GOOGLE_CLIENT_ID     OAuth 2.0 client ID (web application)
  *   GOOGLE_CLIENT_SECRET OAuth 2.0 client secret (KEEP PRIVATE — server-side only)
- *   GOOGLE_REDIRECT_URI  Must match a URI registered in Google Cloud Console
- *     Custom domain:  https://your-domain.com/auth/callback
- *     HF Spaces:      https://yourname-agriscan.hf.space/auth/callback
+ *   GOOGLE_REDIRECT_URI  Public http(s) URL registered in Google Cloud Console.
+ *     Leave empty to derive it from the incoming request host, e.g.
+ *       emulator:  http://10.0.2.2:887/auth/google/callback
+ *       production: https://your-domain.com/auth/google/callback
+ *     A custom-scheme value (com.agriscan.ai://auth) is rejected by Google for
+ *     "Web application" clients — use the HTTP relay below instead.
  *
  * Ask your hoster to set these env vars. The client ID is safe to expose
  * to the frontend; the client secret MUST stay in this config.
@@ -102,7 +106,7 @@ $AI = [
 $GOOGLE = [
     'client_id'     => getenv('GOOGLE_CLIENT_ID') ?: '',
     'client_secret' => getenv('GOOGLE_CLIENT_SECRET') ?: '',
-    'redirect_uri'  => getenv('GOOGLE_REDIRECT_URI') ?: 'com.agriscan.ai://auth',
+    'redirect_uri'  => getenv('GOOGLE_REDIRECT_URI') ?: '',
     'token_endpoint' => 'https://oauth2.googleapis.com/token',
     'userinfo_endpoint' => 'https://oauth2.googleapis.com/tokeninfo',
 ];

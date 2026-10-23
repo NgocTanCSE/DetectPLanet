@@ -1,9 +1,9 @@
 /**
- * HomeScreen — AgriScan AI Home (Editorial Layout + Saved Reports)
+ * HomeScreen — AgriScan AI Home (Minimalist Layout + Saved Reports)
  *
- * Clean editorial layout: green-dot brand mark, hero CTA,
- * stat cards without icons, recent scan carousel, and a saved-reports
- * preview section fed by the backend API.
+ * Clean white-canvas layout: green accent, white cards, green-dot brand mark.
+ * Hero CTA, stat cards without icons, recent scan carousel, and a
+ * saved-reports preview section fed by the backend API.
  *
  * Saved reports are fetched from GET /history (filtered by is_saved),
  * and saved/unsaved via POST /history/{id}/save + /history/{id}/unsave.
@@ -15,18 +15,23 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  Share,
   StyleSheet,
   Dimensions,
   Linking,
   Alert,
+  Platform,
 } from 'react-native';
-import { colors, spacing, typography } from '../utils/theme';
-import AppHeader, { useTopInset, HEADER_HEIGHT } from '../components/layout/AppHeader';
-import { fetchHome } from '../services/api';
+import { colors, spacing, typography, interactive, radius } from '../utils/theme';
+import { useTopInset } from '../components/layout/AppHeader';
+import { BOTTOM_NAV_HEIGHT } from '../components/layout/BottomNav';
+import Icon from '../icons';
+import { fetchHome, fetchUnreadCount } from '../services/api';
 import { getSavedReports } from '../services/storage';
 import { getCurrentUser, onAuthStateChanged } from '../services/auth';
-import { Button, Badge, Card, SectionHeader, EmptyState } from '../components';
+import { Badge, Card, SectionHeader, EmptyState } from '../components';
+import { FadeInView } from '../components/motion';
+
+const isWeb = Platform.OS === 'web';
 
 const useWindowSize = () => {
   const [size, setSize] = useState(Dimensions.get('window'));
@@ -40,22 +45,27 @@ const useWindowSize = () => {
 };
 
 const ScanCard = ({ scan, onPress, style }) => {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <TouchableOpacity
       activeOpacity={0.9}
       onPress={onPress}
-      style={[styles.scanCard, style]}>
+      style={[styles.scanCard, style, hovered && isWeb && interactive.hover.card]}
+      onMouseEnter={() => isWeb && setHovered(true)}
+      onMouseLeave={() => isWeb && setHovered(false)}>
       <View style={styles.scanImgWrap}>
-        <Image source={{ uri: scan.image }} style={styles.scanImg} resizeMode="cover"
-          onError={(e) => console.warn('Scan image error:', e.nativeEvent?.error)} />
-
-        <Badge severity={scan.severity} style={styles.scanBadge} />
-
-        <View style={styles.scanTime}>
-          <Text style={[typography.body.sm, { color: colors['on-surface'] }]}>
-            {scan.time}
-          </Text>
-        </View>
+        {scan.image ? (
+          <Image source={{ uri: scan.image }} style={styles.scanImg} resizeMode="cover"
+            onError={(e) => console.warn('Scan image error:', e.nativeEvent?.error)} />
+        ) : (
+          <View style={[styles.scanImg, styles.scanImgEmpty]}>
+            <Icon name="document_scanner" size={22} color={colors.muted} />
+          </View>
+        )}
+        <Badge severity={scan.severity} style={styles.scanBadge}>
+          {scan.label || 'Chưa rõ'}
+        </Badge>
       </View>
       <View style={styles.scanBody}>
         <Text style={[typography.body.sm, { color: colors.muted, textTransform: 'uppercase', letterSpacing: 0.5 }]}>
@@ -65,8 +75,10 @@ const ScanCard = ({ scan, onPress, style }) => {
           {scan.disease}
         </Text>
         <View style={styles.scanMeta}>
-          <Text style={[typography.body.sm, { color: colors.muted }]}>Độ khớp:</Text>
-          <Text style={[typography['metric-confidence'], { color: colors.primary, fontWeight: '700' }]}>
+          <Text style={[typography.body.sm, { color: colors.muted }]} numberOfLines={1}>
+            {scan.time}
+          </Text>
+          <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '700' }]}>
             {scan.confidence}%
           </Text>
         </View>
@@ -75,47 +87,103 @@ const ScanCard = ({ scan, onPress, style }) => {
   );
 };
 
-const ArticleCard = ({ article, onPress }) => (
-  <Card style={styles.articleCard}>
-    <Image source={{ uri: article.image }} style={styles.articleImg} resizeMode="cover"
-      onError={(e) => console.warn('Article image error:', e.nativeEvent?.error)} />
-    <View style={styles.articleBody}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-        <View style={[styles.articleTag, { backgroundColor: colors['surface-container-low'] }]}>
-          <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '600' }]}>
-            {article.label}
-          </Text>
-        </View>
-        <Text style={[typography.body.sm, { color: colors.muted }]}>{article.time}</Text>
-      </View>
-      <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600', marginBottom: 6 }]} numberOfLines={2}>
-        {article.title}
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-        <Text style={[typography.body.md, { color: colors.primary, fontWeight: '600' }]}>{article.action}</Text>
-        <Text style={[typography.body.sm, { color: colors.primary }]}>›</Text>
-      </View>
-    </View>
-  </Card>
-);
+const ArticleCard = ({ article, onPress }) => {
+  const [hovered, setHovered] = useState(false);
 
-const SavedReportRow = ({ report, onPress }) => (
-  <Card style={styles.savedRow} padding={10}>
-    <Image source={{ uri: report.image || '' }} style={styles.savedThumb} resizeMode="cover"
-      onError={(e) => console.warn('Saved image error:', e.nativeEvent?.error)} />
-    <View style={{ flex: 1, minWidth: 0 }}>
-      <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]} numberOfLines={1}>
-        {report.crop || 'Cây trồng'} — {report.disease || 'Chưa xác định'}
+  return (
+    <Card
+      padding={0}
+      onPress={onPress}
+      style={[styles.articleCard, hovered && isWeb && interactive.hover.card]}
+      onMouseEnter={() => isWeb && setHovered(true)}
+      onMouseLeave={() => isWeb && setHovered(false)}>
+      {article.image ? (
+        <Image
+          source={{ uri: article.image }}
+          style={styles.articleImg}
+          resizeMode="cover"
+          onError={(e) => console.warn('Article image error:', e.nativeEvent?.error)}
+        />
+      ) : null}
+      <View style={styles.articleBody}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+          <View style={[styles.articleTag, { backgroundColor: colors['surface-container-low'] }]}>
+            <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '600' }]}>
+              {article.label}
+            </Text>
+          </View>
+          <Text style={[typography.body.sm, { color: colors.muted }]}>{article.time}</Text>
+        </View>
+        <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600', marginBottom: 8 }]} numberOfLines={2}>
+          {article.title}
+        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <Text style={[typography.body.md, { color: colors.primary, fontWeight: '600' }]}>
+            {{ learn: 'Đọc thêm', read: 'Đọc bài', watch: 'Xem video' }[article.action] || 'Đọc thêm'}
+          </Text>
+          <Text style={[typography.body.sm, { color: colors.primary }]}>›</Text>
+        </View>
+      </View>
+    </Card>
+  );
+};
+
+const QuickChip = ({ icon, label, onPress }) => {
+  const [hovered, setHovered] = useState(false);
+
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={[styles.quickChip, hovered && isWeb && interactive.hover.surface]}
+      onMouseEnter={() => isWeb && setHovered(true)}
+      onMouseLeave={() => isWeb && setHovered(false)}>
+      <Icon name={icon} size={16} color={colors.primary} />
+      <Text style={[typography.label.md, { color: colors['on-surface'] }]}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
+
+const SavedReportRow = ({ report, onPress }) => {
+  const [hovered, setHovered] = useState(false);
+  const cropName = report.cropLabel || report.crop || 'Cây trồng';
+  const disease = report.title || report.disease;
+
+  return (
+    <Card
+      onPress={onPress}
+      style={[styles.savedRow, hovered && isWeb && interactive.hover.card]}
+      onMouseEnter={() => isWeb && setHovered(true)}
+      onMouseLeave={() => isWeb && setHovered(false)}
+      padding={10}>
+      {report.image ? (
+        <Image
+          source={{ uri: report.image }}
+          style={styles.savedThumb}
+          resizeMode="cover"
+          onError={(e) => console.warn('Saved image error:', e.nativeEvent?.error)}
+        />
+      ) : (
+        <View style={[styles.savedThumb, styles.savedThumbEmpty]}>
+          <Icon name="document_scanner" size={18} color={colors.muted} />
+        </View>
+      )}
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]} numberOfLines={1}>
+          {disease ? `${cropName} — ${disease}` : cropName}
+        </Text>
+        <Text style={[typography.body.sm, { color: colors.muted }]} numberOfLines={1}>
+          {report.time || report.id || ''}
+        </Text>
+      </View>
+      <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '700' }]}>
+        {report.confidence ? `${report.confidence}%` : ''}
       </Text>
-      <Text style={[typography.body.sm, { color: colors.muted }]} numberOfLines={1}>
-        {report.time || report.id || ''}
-      </Text>
-    </View>
-    <Text style={[typography.body.sm, { color: colors.primary, fontWeight: '700' }]}>
-      {report.confidence ? `${report.confidence}%` : ''}
-    </Text>
-  </Card>
-);
+    </Card>
+  );
+};
 
 const HomeScreen = ({ navigation }) => {
   const topInset = useTopInset();
@@ -124,6 +192,7 @@ const HomeScreen = ({ navigation }) => {
   const [articles, setArticles] = useState([]);
   const [savedReports, setSavedReports] = useState([]);
   const [user, setUser] = useState(getCurrentUser());
+  const [unread, setUnread] = useState(0);
   const { width } = useWindowSize();
   const isDesktop = width >= 768;
   const CONTAINER_MAX = 1024;
@@ -133,8 +202,8 @@ const HomeScreen = ({ navigation }) => {
       try {
         const d = await fetchHome();
         setStats(d.stats || []);
-        setRecentScans(d.recent || []);
-        setArticles(d.articles || []);
+        setRecentScans((d.recent || []).slice(0, 3));
+        setArticles((d.articles || []).slice(0, 3));
       } catch {
         /* no backend / offline */
       }
@@ -148,6 +217,25 @@ const HomeScreen = ({ navigation }) => {
     load();
   }, []);
 
+  // Badge thông báo: hỏi ngay khi mở Trang chủ + mỗi 60s khi app còn mở.
+  useEffect(() => {
+    let alive = true;
+    const tick = async () => {
+      try {
+        const d = await fetchUnreadCount();
+        if (alive) setUnread(d.unread || 0);
+      } catch {
+        /* offline — giữ badge cũ */
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 60000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, []);
+
   // Subscribe to auth state changes (user name greeting updates live)
   useEffect(() => {
     const unsub = onAuthStateChanged((u) => setUser(u));
@@ -155,8 +243,11 @@ const HomeScreen = ({ navigation }) => {
   }, []);
 
   const goScan = () => navigation?.navigate?.('camera');
-  const goResult = () => navigation?.navigate?.('result');
   const goHistory = () => navigation?.navigate?.('history');
+  const goAlerts = () => navigation?.navigate?.('alerts');
+  const goGuides = () => navigation?.navigate?.('guides');
+  const goReport = () => navigation?.navigate?.('report', {});
+  const goNotifications = () => navigation?.navigate?.('notifications');
   const goArticle = (url) => {
     const target = url || 'https://agriscan.ai';
     Linking.canOpenURL(target).then((supported) => {
@@ -167,80 +258,100 @@ const HomeScreen = ({ navigation }) => {
       }
     });
   };
-  const shareHome = async () => {
-    try {
-      await Share.share({
-        message: 'AgriScan AI - Ứng dụng chẩn đoán bệnh cây trồng.',
-        url: 'https://agriscan.ai',
-      });
-    } catch {
-      /* no-op */
-    }
-  };
-
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader
-        title="AgriScan AI"
-        subtitle="Trang chủ"
-        actions={[
-          { icon: 'history', label: 'Lịch sử', onPress: goHistory },
-          { icon: 'share', label: 'Chia sẻ', onPress: shareHome },
-        ]}
-      />
-
       <ScrollView
         contentContainerStyle={{
-          paddingTop: topInset + HEADER_HEIGHT,
-          paddingBottom: 96,
+          paddingTop: topInset + spacing['space-lg'],
+          paddingBottom: BOTTOM_NAV_HEIGHT + spacing['space-2xl'],
           paddingHorizontal: isDesktop ? spacing['space-xl'] : spacing.gutter,
           gap: spacing['space-lg'],
           ...(isDesktop
             ? { alignSelf: 'center', width: CONTAINER_MAX, marginHorizontal: 'auto' }
             : {}),
         }}>
-        {/* Farmer greeting — text only */}
-        <View>
-          <Text style={[typography.headline.lg, { color: colors['on-surface'] }]}>
-            {user ? `Chào ${user.name || user.email || 'Bạn'}` : 'Chào bạn'}
-          </Text>
-          <Text style={[typography.body.md, { color: colors.muted, marginTop: 2 }]}>
-            Theo dõi sức khỏe đồng ruộng hôm nay
-          </Text>
-        </View>
-
-        {/* Primary Hero Section — clean card, green accent, no icons */}
-        <Card style={styles.hero} padding={20}>
-          <View style={{ flex: 1 }}>
-            <View style={styles.heroHeaderRow}>
-              <View style={styles.heroChip}>
-                <View style={[styles.heroDot, { backgroundColor: colors.primary }]} />
-                <Text style={styles.heroChipText}>CHẨN ĐOÁN LÁ CÂY</Text>
-              </View>
-            </View>
-
-            <Text style={styles.heroTitle}>
-              Phát hiện sâu bệnh tức thì
+        {/* Farmer greeting + inline actions — text only, no header */}
+        <FadeInView delay={0} translateY={8} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[typography.headline.lg, { color: colors['on-surface'] }]}>
+              {user ? `Chào ${user.name || user.email || 'Bạn'}` : 'Chào bạn'}
             </Text>
-            <Text style={styles.heroSubtitle}>
-              Chụp hoặc chọn ảnh lá cây để nhận diện bệnh hại và nhận hướng dẫn điều trị chuẩn nông vụ.
+            <Text style={[typography.body.md, { color: colors.muted, marginTop: 4 }]}>
+              Theo dõi sức khỏe đồng ruộng hôm nay
             </Text>
-
-            {/* CTA — solid green, text only (no camera/chevron icons) */}
-            <Button
-              variant="primary"
-              onPress={goScan}
-              style={styles.heroCta}
-              accessibilityLabel="Bắt đầu quét mẫu lá">
-              Bắt đầu quét mẫu lá
-            </Button>
           </View>
-        </Card>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={unread > 0 ? `Thông báo, ${unread} chưa đọc` : 'Thông báo'}
+            onPress={goNotifications}
+            style={styles.bellButton}>
+            <Icon name="notifications" size={22} color={colors['on-surface']} />
+            {unread > 0 ? (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>{unread > 9 ? '9+' : String(unread)}</Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
+        </FadeInView>
 
-        {/* Saved Reports preview section (new feature) */}
+        {/* Quick shortcuts — 3 màn con, không phải tab */}
+        <FadeInView delay={70} translateY={8} style={styles.quickRow}>
+          <QuickChip icon="history" label="Lịch sử" onPress={goHistory} />
+          <QuickChip icon="warning" label="Cảnh báo" onPress={goAlerts} />
+          <QuickChip icon="send" label="Báo dịch" onPress={goReport} />
+          <QuickChip icon="menu_book" label="Cẩm nang" onPress={goGuides} />
+        </FadeInView>
+
+        {/* Số liệu hôm nay */}
+        <FadeInView delay={130} translateY={10}>
+          <SectionHeader title="Hôm nay" subtitle="Cập nhật mới nhất" />
+          <View style={{ flexDirection: 'row', flexWrap: isDesktop ? 'wrap' : 'nowrap', gap: spacing['space-sm'] }}>
+            {(stats.length > 0
+              ? stats
+              : [{ label: 'Chưa có dữ liệu', value: '—', color: 'primary' }]
+            ).map((s) => {
+              return (
+                <Card key={s.label} style={[styles.statCard, isDesktop && { minWidth: 180, flex: '1 1 180' }]} padding={12}>
+                  <Text style={[typography.headline.md, { color: colors['on-surface'] }]}>{s.value}</Text>
+                  <Text style={[typography.body.sm, { color: colors.muted, textAlign: 'center' }]} numberOfLines={1}>
+                    {s.label === 'Tổng quan hôm nay' ? 'Tổng quan' : s.label}
+                  </Text>
+                </Card>
+              );
+            })}
+          </View>
+        </FadeInView>
+
+        {/* Mẫu quét gần đây */}
+        <FadeInView delay={190} translateY={10}>
+          <SectionHeader title="Mẫu quét gần đây" actionLabel="Xem tất cả" onAction={goHistory} />
+          {recentScans.length === 0 ? (
+            <TouchableOpacity activeOpacity={0.9} onPress={goScan} style={styles.emptyRow}>
+              <Icon name="photo_camera" size={18} color={colors.primary} />
+              <Text style={[typography.body.md, { color: colors['on-surface'], flex: 1 }]}>
+                Chưa có mẫu nào — quét mẫu lá đầu tiên
+              </Text>
+              <Icon name="chevron_right" size={16} color={colors.muted} />
+            </TouchableOpacity>
+          ) : isDesktop ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+              {recentScans.map((s) => (
+                <ScanCard key={s.id} scan={s} onPress={() => navigation?.navigate?.('result', { scanId: s.id })} style={{ flex: '1 1 200' }} />
+              ))}
+            </View>
+          ) : (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingVertical: 4, paddingRight: spacing.gutter }}>
+              {recentScans.map((s) => (
+                <ScanCard key={s.id} scan={s} onPress={() => navigation?.navigate?.('result', { scanId: s.id })} />
+              ))}
+            </ScrollView>
+          )}
+        </FadeInView>
+
+        {/* Báo cáo đã lưu */}
         {savedReports.length > 0 ? (
-          <View>
-            <SectionHeader title="Báo cáo đã lưu" subtitle="Mẫu đã lưu để tham khảo sau" actionLabel="Xem tất cả" onAction={goHistory} />
+          <FadeInView delay={250} translateY={10}>
+            <SectionHeader title="Báo cáo đã lưu" actionLabel="Xem tất cả" onAction={goHistory} />
             <View style={{ gap: 8 }}>
               {savedReports.map((r) => (
                 <SavedReportRow
@@ -250,211 +361,151 @@ const HomeScreen = ({ navigation }) => {
                 />
               ))}
             </View>
-          </View>
+          </FadeInView>
         ) : null}
 
-        {/* Farm overview metrics — text only, no stat icons */}
-        <View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: spacing['space-sm'] }}>
-            <Text style={[typography.headline.sm, { color: colors['on-surface'] }]}>Tổng quan hôm nay</Text>
-            <Text style={[typography.body.sm, { color: colors.muted }]}>Cập nhật mới nhất</Text>
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: isDesktop ? 'wrap' : 'nowrap', gap: spacing['space-sm'] }}>
-            {stats.length === 0 ? (
-              <Card style={[styles.statCard, { flex: 1, padding: 16 }]}>
-                <Text style={[typography.body.sm, { color: colors.muted }]}>Chưa có dữ liệu thống kê hôm nay.</Text>
-              </Card>
+        {/* Mẹo canh tác */}
+        <FadeInView delay={310} translateY={10}>
+          <SectionHeader title="Mẹo canh tác" actionLabel="Cẩm nang" onAction={goGuides} />
+          <View style={{ gap: 10 }}>
+            {articles.length === 0 ? (
+              <EmptyState message="Chưa có bài viết nào." />
             ) : (
-              stats.map((s) => {
-                const dotColor = s.color === 'primary' ? colors.primary
-                    : s.color === 'status-danger' ? colors['status-danger']
-                    : s.color === 'status-healthy' ? colors['status-healthy']
-                    : colors.primary;
-                return (
-                  <Card key={s.label} style={[styles.statCard, isDesktop && { minWidth: 186, flex: '1 1 186' }]} padding={14}>
-                    <View style={[styles.statDot, { backgroundColor: dotColor + '20' }]}>
-                      <View style={[styles.statDotInner, { backgroundColor: dotColor }]} />
-                    </View>
-                    <Text style={[typography['metric-confidence'], { color: colors['on-surface'] }]}>{s.value}</Text>
-                    <Text style={[typography.body.sm, { color: colors.muted }]}>{s.label}</Text>
-                  </Card>
-                );
-              })
+              articles.map((a) => (
+                <ArticleCard key={a.id} article={a} onPress={() => goArticle(a.url)} />
+              ))
             )}
           </View>
-        </View>
-
-        {/* 2-col dashboard: Recent scans | Guides */}
-        <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: isDesktop ? spacing['space-lg'] : undefined }}>
-          {/* Recent scan records */}
-          <View style={{ flex: isDesktop ? '1 1 500' : 1, minWidth: 0 }}>
-            <SectionHeader title="Mẫu quét gần đây" subtitle="Các mẫu lá đã được phân loại" actionLabel="Xem tất cả" onAction={goHistory} />
-            {isDesktop ? (
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-                {recentScans.length === 0 ? (
-                  <EmptyState message="Chưa có lịch sử quét nào." />
-                ) : (
-                  recentScans.map((s) => (
-                    <ScanCard key={s.id} scan={s} onPress={() => navigation?.navigate?.('result', { scanId: s.id })} style={{ flex: '1 1 220' }} />
-                  ))
-                )}
-              </View>
-            ) : (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingVertical: 6 }}>
-                {recentScans.length === 0 ? (
-                  <EmptyState message="Chưa có lịch sử quét nào." />
-                ) : (
-                  recentScans.map((s) => (
-                    <ScanCard key={s.id} scan={s} onPress={() => navigation?.navigate?.('result', { scanId: s.id })} />
-                  ))
-                )}
-              </ScrollView>
-            )}
-          </View>
-
-          {/* Agricultural guides & seasonal tips — text only */}
-          <View style={{ flex: isDesktop ? '1 1 420' : 1, minWidth: 0 }}>
-            <SectionHeader title="Mẹo canh tác & Cảnh báo mùa vụ" subtitle="Tài liệu kỹ thuật từ chuyên gia nông nghiệp" />
-            <View style={{ gap: 10 }}>
-              {articles.length === 0 ? (
-                <EmptyState message="Chưa có bài viết nào." />
-              ) : (
-                articles.map((a) => (
-                  <ArticleCard key={a.id} article={a} onPress={() => goArticle(a.url)} />
-                ))
-              )}
-            </View>
-          </View>
-        </View>
+        </FadeInView>
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  hero: {
-    borderRadius: 12,
-    backgroundColor: colors['primary-subtle'],
+  bellButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors['surface-container-low'],
     borderWidth: 1,
     borderColor: colors.outline,
   },
-  heroHeaderRow: {
-    flexDirection: 'row',
+  bellBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    borderRadius: 8,
+    backgroundColor: colors['status-danger'],
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'center',
   },
-  heroChip: {
+  bellBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    lineHeight: 12,
+  },
+  quickRow: {
+    flexDirection: 'row',
+    gap: spacing['space-sm'],
+  },
+  quickChip: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderRadius: 6,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: radius.full,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.outline,
   },
-  heroDot: { width: 5, height: 5, borderRadius: 3 },
-  heroChipText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.primary,
-    letterSpacing: 0.6,
-    fontFamily: 'PlusJakartaSans-Medium',
-  },
-  heroTitle: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: '700',
-    color: colors['on-surface'],
-    fontFamily: 'Geist',
-    marginBottom: 6,
-  },
-  heroSubtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.muted,
-    marginBottom: 18,
-    fontFamily: 'PlusJakartaSans-Regular',
-  },
-  heroCta: {
-    alignSelf: 'flex-start',
-    marginTop: 4,
+  emptyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.outline,
+    backgroundColor: colors['surface-container-low'],
   },
   statCard: {
     flex: 1,
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     alignItems: 'center',
     gap: 4,
+    paddingVertical: 14,
     borderWidth: 1,
     borderColor: colors.outline,
   },
-  statDot: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 2,
-  },
-  statDotInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
   scanCard: {
-    width: 240,
-    borderRadius: 8,
+    width: 196,
+    borderRadius: 10,
     backgroundColor: colors.surface,
     padding: 12,
     gap: 10,
     borderWidth: 1,
     borderColor: colors.outline,
   },
+  scanImgWrap: {
+    width: '100%',
+    height: 104,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors['surface-container-low'],
+  },
+  scanImg: { width: '100%', height: '100%' },
+  scanImgEmpty: { alignItems: 'center', justifyContent: 'center' },
   scanBadge: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 10,
+    right: 10,
   },
-  scanTime: {
-    position: 'absolute',
-    bottom: 8,
-    left: 8,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 6,
-    backgroundColor: 'rgba(20, 20, 20, 0.75)',
-  },
-  scanBody: { gap: 2 },
-  scanMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  scanBody: { gap: 3 },
+  scanMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginTop: 6 },
   articleCard: {
     flexDirection: 'row',
-    gap: 12,
-    borderRadius: 8,
+    gap: 14,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.outline,
     overflow: 'hidden',
   },
-  articleImg: { width: 84, height: 84, borderRadius: 6 },
-  articleBody: { flex: 1, minWidth: 0, justifyContent: 'center', padding: 12 },
+  articleImg: { width: 90, height: 90, borderRadius: 8 },
+  articleBody: { flex: 1, minWidth: 0, justifyContent: 'center', padding: 14 },
   articleTag: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
     borderRadius: 6,
     marginBottom: 4,
   },
   savedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    borderRadius: 8,
+    gap: 12,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: colors.outline,
     overflow: 'hidden',
   },
-  savedThumb: { width: 44, height: 44, borderRadius: 6 },
+  savedThumb: { width: 44, height: 44, borderRadius: 8 },
+  savedThumbEmpty: {
+    backgroundColor: colors['surface-container-low'],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });
 
 export default HomeScreen;

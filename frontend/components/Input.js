@@ -3,9 +3,11 @@
  *
  * Ô nhập liệu có viền, placeholder màu nhạt, tập trung vào tính đọc được.
  */
-import React from 'react';
-import { TextInput, StyleSheet, Platform } from 'react-native';
-import { colors, radius, spacing, typography } from '../utils/theme';
+import React, { useState } from 'react';
+import { View, TextInput, StyleSheet, Platform } from 'react-native';
+import { colors, radius, spacing, interactive } from '../utils/theme';
+
+const isWeb = Platform.OS === 'web';
 
 export const Input = ({
   value,
@@ -23,10 +25,13 @@ export const Input = ({
   containerStyle,
   numberOfLines,
 }) => {
+  const [focused, setFocused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+
   return (
     <View style={[styles.wrapper, containerStyle]}>
       <TextInput
-        style={[styles.input, style]}
+        style={[styles.input, style, focused && isWeb && interactive.focus.outline]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -36,6 +41,10 @@ export const Input = ({
         keyboardType={keyboardType}
         returnKeyType={returnKeyType}
         onSubmitEditing={onSubmitEditing}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onMouseEnter={() => isWeb && setHovered(true)}
+        onMouseLeave={() => isWeb && setHovered(false)}
         maxHeight={maxHeight}
         minHeight={minHeight}
         numberOfLines={numberOfLines}
@@ -56,10 +65,10 @@ const styles = StyleSheet.create({
     color: colors['on-surface'],
     fontSize: 15,
     lineHeight: 20,
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Inter-Regular',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    minHeight: 40,
+    paddingVertical: 12,
+    minHeight: 44,
     flex: 1,
   },
 });

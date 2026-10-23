@@ -49,6 +49,10 @@ try {
   /* react-native-config not installed yet — using dev default (localhost:887) */
 }
 
+// Exposed for diagnostics (Settings → Máy chủ API): shows the URL actually in
+// use, including the dev fallback when react-native-config has no API_URL.
+export const API_BASE_URL = BASE_URL;
+
 const DEFAULT_TIMEOUT_MS = 15000;
 const jsonHeaders = {
   "Content-Type": "application/json",
@@ -118,13 +122,18 @@ async function request(path, options = {}) {
   const controller =
     typeof AbortController !== "undefined" ? new AbortController() : null;
 
+  // Auto-attach session token when available so every protected endpoint
+  // receives auth credentials without each caller needing to pass headers.
+  const token = getSessionToken();
+  const authHeaders = token ? { Authorization: "Bearer " + token } : {};
+
   let lastResult = null;
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     const timer = setTimeout(() => controller?.abort?.(), timeoutMs);
     try {
       const res = await fetch(BASE_URL + path, {
         ...fetchOptions,
-        headers: { ...jsonHeaders, ...(options.headers || {}) },
+        headers: { ...jsonHeaders, ...authHeaders, ...(options.headers || {}) },
         signal: controller?.signal,
       });
       const data = await res.json().catch(() => null);
@@ -227,10 +236,10 @@ export async function unsaveRecord(id) {
 }
 
 /** @returns {Promise<ScanSession>} */
-export async function analyzeImage(imageUri, base64 = "") {
+export async function analyzeImage(imageUri, base64 = "", crop = "", cropLabel = "") {
   const json = await request("/analyze", {
     method: "POST",
-    body: JSON.stringify({ imageUri, base64 }),
+    body: JSON.stringify({ imageUri, base64, crop, crop_label: cropLabel }),
     headers: await getAuthHeaders(),
     timeoutMs: 120000, // vision inference can take up to AI_TIMEOUT (90s) server-side
   });
@@ -267,6 +276,63 @@ export async function verifySession(token) {
  * @param {Array<{role: string, content: string}>} messages
  * @returns {Promise<{role: string, content: string}>}
  */
+/* ---- Alerts + location ---- */
+export async function fetchAlerts() {
+  const json = await request("/alerts", { method: "GET", headers: await getAuthHeaders() });
+  return json && Array.isArray(json.alerts) ? json : { alerts: [], province: "" };
+}
+
+export async function fetchCropPreferences() {
+  const json = await request("/user-crop-preferences", {
+    method: "GET",
+    headers: await getAuthHeaders(),
+  });
+  return json && Array.isArray(json.preferences) ? json : { preferences: [] };
+}
+
+export async function saveCropPreference(cropId, isActive) {
+  const json = await request("/user-crop-preferences", {
+    method: "POST",
+    body: JSON.stringify({ crop_id: cropId, is_active: isActive ? 1 : 0 }),
+    headers: await getAuthHeaders(),
+  });
+  return json || { ok: false };
+}
+
+export async function fetchUserLocation() {
+  const json = await request("/user-location", { method: "GET", headers: await getAuthHeaders() });
+  return json && typeof json.province === "string"
+    ? { province: json.province, provinces: json.provinces || [] }
+    : { province: "", provinces: [] };
+}
+
+export async function saveUserLocation(province) {
+  const json = await request("/user-location", {
+    method: "POST",
+    body: JSON.stringify({ province }),
+    headers: await getAuthHeaders(),
+  });
+  return json || { ok: false };
+}
+
+/* ---- Chat history (per account) ---- */
+export async function fetchChatHistory(limit = 100) {
+  const json = await request(`/chat/history?limit=${limit}`, {
+    method: "GET",
+    headers: await getAuthHeaders(),
+  });
+  return json && Array.isArray(json.messages) ? json : { messages: [] };
+}
+
+export async function clearChatHistory() {
+  const json = await request("/chat/history/clear", {
+    method: "POST",
+    body: JSON.stringify({}),
+    headers: await getAuthHeaders(),
+  });
+  return json || { ok: false };
+}
+
 export async function chatWithAI(messages) {
   const json = await request("/chat", {
     method: "POST",
@@ -285,6 +351,59 @@ export async function chatWithAI(messages) {
   return json;
 }
 
+/* ---- Báo cáo cộng đồng (GĐ4) ---- */
+/**
+ * Gửi báo cáo dịch. Trả { ok, id } hoặc { error, message }.
+ */
+export async function createReport({ crop, cropId, diseaseLabel, province, ward, note, imageUrl }) {
+  const json = await request("/reports", {
+    method: "POST",
+    body: JSON.stringify({
+      crop: crop || "",
+      crop_id: cropId || undefined,
+      disease_label: diseaseLabel || "",
+      province: province || "",
+      ward: ward || "",
+      note: note || "",
+      image_url: imageUrl || "",
+    }),
+  });
+  return json || { error: "network", message: "Không kết nối được máy chủ." };
+}
+
+/** @returns {Promise<{reports: Array}>} */
+export async function fetchReports(province = "", days = 30) {
+  const params = new URLSearchParams();
+  if (province) params.set("province", province);
+  params.set("days", String(days));
+  const json = await request(`/reports?${params.toString()}`, { method: "GET" });
+  return { reports: (json && json.reports) || [] };
+}
+
+export async function confirmReport(id) {
+  const json = await request(`/reports/${encodeURIComponent(id)}/confirm`, { method: "POST" });
+  return json || { error: "network" };
+}
+
+/* ---- Thông báo trong app (GĐ4a) ---- */
+export async function fetchNotifications(limit = 50) {
+  const json = await request(`/notifications?limit=${limit}`, { method: "GET" });
+  return { notifications: (json && json.notifications) || [] };
+}
+
+export async function fetchUnreadCount() {
+  const json = await request("/notifications/unread-count", { method: "GET" });
+  return { unread: (json && Number(json.unread)) || 0 };
+}
+
+export async function markNotificationsRead(id = "") {
+  const json = await request("/notifications/read", {
+    method: "POST",
+    body: JSON.stringify(id ? { id } : {}),
+  });
+  return json || { error: "network" };
+}
+
 export { normalizeImageUrl };
 
 export default {
@@ -299,4 +418,17 @@ export default {
   googleLogin,
   verifySession,
   chatWithAI,
+  fetchChatHistory,
+  clearChatHistory,
+  fetchAlerts,
+  fetchCropPreferences,
+  saveCropPreference,
+  fetchUserLocation,
+  saveUserLocation,
+  createReport,
+  fetchReports,
+  confirmReport,
+  fetchNotifications,
+  fetchUnreadCount,
+  markNotificationsRead,
 };

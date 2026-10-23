@@ -2,10 +2,13 @@
  * AgriScan AI — Pill component
  *
  * Bo tròn lớn hơn Badge, dùng làm filter pill hoặc tab nhấn nhá.
+ * Hover highlight trên web, màu xanh khi active.
  */
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors, radius, typography, spacing } from '../utils/theme';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { colors, radius, interactive } from '../utils/theme';
+
+const isWeb = Platform.OS === 'web';
 
 export const Pill = ({
   label,
@@ -16,6 +19,11 @@ export const Pill = ({
   textStyle,
   accessibilityLabel,
 }) => {
+  const [hovered, setHovered] = useState(false);
+
+  const handleMouseEnter = isWeb ? () => setHovered(true) : undefined;
+  const handleMouseLeave = isWeb ? () => setHovered(false) : undefined;
+
   return (
     <TouchableOpacity
       accessible={true}
@@ -27,9 +35,12 @@ export const Pill = ({
       style={[
         styles.container,
         active ? styles.active : styles.inactive,
+        hovered && isWeb && !active && interactive.hover.surface,
         disabled && styles.disabled,
         style,
-      ]}>
+      ]}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}>
       <Text style={[styles.text, active ? styles.activeText : styles.inactiveText, textStyle]}>
         {label}
       </Text>
@@ -40,14 +51,16 @@ export const Pill = ({
 const styles = StyleSheet.create({
   container: {
     borderRadius: radius.full,
-    paddingHorizontal: 16,
-    paddingVertical: 7,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    minHeight: 36,
+    minHeight: 38,
   },
   active: {
     backgroundColor: colors.primary,
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   inactive: {
     backgroundColor: colors['surface-container-low'],
@@ -60,7 +73,7 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 14,
     fontWeight: '600',
-    fontFamily: 'PlusJakartaSans-Medium',
+    fontFamily: 'Inter-SemiBold',
     textAlign: 'center',
   },
   activeText: {

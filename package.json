@@ -4,7 +4,9 @@
   "main": "index.js",
   "scripts": {
     "start": "react-native start",
+    "check:name": "node scripts/check-app-registry-name.js",
     "android": "react-native run-android",
+    "android:reverse": "adb reverse tcp:8081 tcp:8081 && adb reverse tcp:1887 tcp:1887",
     "android:release": "cd android && ./gradlew assembleRelease",
     "emu": "emulator -avd dtct -no-audio -no-boot-anim",
     "up": "./up.sh",

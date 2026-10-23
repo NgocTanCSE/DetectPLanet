@@ -7,7 +7,7 @@
  */
 import React from 'react';
 import { View } from 'react-native';
-import Svg, { Path, Circle, Rect, Line, Polyline, Text as SvgText } from 'react-native-svg';
+import Svg, { Path, Circle, Rect, Line, Polyline, Polygon as SvgPolygon, Text as SvgText } from 'react-native-svg';
 import { colors } from './utils/theme';
 
 // Clean 24x24 SVG definitions (strokeWidth 2, round linecap/linejoin by default)
@@ -130,7 +130,7 @@ const ICONS = {
     </>
   ),
   bolt: (c) => (
-    <Polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <SvgPolygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
   ),
   warning: (c) => (
     <>
@@ -263,7 +263,7 @@ const ICONS = {
     </>
   ),
   flash_on: (c) => (
-    <Polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    <SvgPolygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
   ),
   grid_on: (c) => (
     <>
@@ -372,7 +372,7 @@ const ICONS = {
         fill="#ffffff"
         fontSize="12"
         fontWeight="bold"
-        fontFamily="PlusJakartaSans-SemiBold"
+        fontFamily="Inter-SemiBold"
       >
         G
       </SvgText>
@@ -380,21 +380,8 @@ const ICONS = {
   ),
 };
 
-// Simple polygon component helper for bolt / flash
-function Polygon({ points, stroke, strokeWidth, strokeLinecap, strokeLinejoin, fill }) {
-  const pts = points.split(' ').map(p => p.split(',').map(Number));
-  const d = pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p[0]} ${p[1]}`).join(' ') + 'Z';
-  return (
-    <Path
-      d={d}
-      stroke={stroke}
-      strokeWidth={strokeWidth}
-      strokeLinecap={strokeLinecap}
-      strokeLinejoin={strokeLinejoin}
-      fill={fill}
-    />
-  );
-}
+// SvgPolygon is imported from react-native-svg above — native polygon rendering
+// handles the "x1 y1 x2 y2..." points format correctly.
 
 const Icon = ({ name, size = 18, color, style }) => {
   const iconColor = color || colors['on-surface'];

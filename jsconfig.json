@@ -38,7 +38,8 @@
     "frontend/screens/HistoryScreen.js",
     "frontend/screens/ChatScreen.js",
     "frontend/screens/GuidesScreen.js",
-    "frontend/screens/SettingsScreen.js"
+    "frontend/screens/SettingsScreen.js",
+    "frontend/screens/AlertScreen.js"
   ],
   "exclude": [
     "node_modules",

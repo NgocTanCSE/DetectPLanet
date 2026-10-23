@@ -2,7 +2,7 @@
  * AgriScan AI — extended seed DATA generator (PostgreSQL).
  *
  * Generates db/seed_data.sql with:
- *   - ~200 rows in the parent `scans` table (185 done / 15 processing),
+ *   - 200 rows in the parent `scans` table (~175 done / ~25 processing),
  *   - 3 scan_pipeline_steps per scan + 2 scan_detections per scan,
  *   - richer reference data: articles, guides, guide_sections.
  *
@@ -254,8 +254,7 @@ const articleActions = ['read', 'watch', 'learn'];
 const articles = [];
 for (let i = 0; i < 20; i++) {
   const tpl = randItem(articleLabels);
-  const age = i < 6 ? randRange(1, 59) : randRange(1, 168); // minutes or hours
-  const unit = i < 6 ? 'phút trước' : randRange(1, 24) === age && age <= 24 ? age + ' giờ trước' : Math.ceil(age / 24) + ' ngày trước';
+  const age = i < 6 ? randRange(1, 59) : randRange(1, 168); // minutes (i<6) or hours (i>=6; 168h = 7d)
   let timeStr;
   if (i < 6) timeStr = age + ' phút trước';
   else if (age <= 24) timeStr = age + ' giờ trước';

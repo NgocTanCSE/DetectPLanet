@@ -33,6 +33,7 @@ function requireDb() {
 /**
  * Extract authenticated user ID from Bearer token.
  * Returns NULL when no/invalid token (dev mode: returns all rows).
+ * When REQUIRE_AUTH=true, sends 401 and exits on missing/invalid token.
  */
 function getUserIdFromToken() {
     global $pdo;
@@ -43,11 +44,38 @@ function getUserIdFromToken() {
     } else {
         $token = $_SERVER['HTTP_X_AUTH_TOKEN'] ?? '';
     }
-    if (!$token) return null;
+    if (!$token) {
+        if (strtolower(getenv('REQUIRE_AUTH') ?: '') === 'true') {
+            sendJson([
+                'error'   => 'No session token',
+                'message' => 'Vui lòng đăng nhập để sử dụng tính năng này.',
+            ], 401);
+        }
+        // Dev mode fallback: return first user so POST endpoints have a
+        // concrete user_id for writes (GET endpoints ignore the value via
+        // userScope(null) → '').
+        $dev = $pdo->prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1");
+        $dev->execute();
+        $devRow = $dev->fetch();
+        return $devRow ? (int) $devRow['id'] : null;
+    }
     $stmt = $pdo->prepare("SELECT user_id FROM sessions WHERE id = ? AND expires_at > NOW() LIMIT 1");
     $stmt->execute([$token]);
     $row = $stmt->fetch();
-    return $row ? (int) $row['user_id'] : null;
+    if (!$row) {
+        if (strtolower(getenv('REQUIRE_AUTH') ?: '') === 'true') {
+            sendJson([
+                'error'   => 'Invalid or expired session',
+                'message' => 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
+            ], 401);
+        }
+        // Dev mode fallback (same as above).
+        $dev = $pdo->prepare("SELECT id FROM users ORDER BY id ASC LIMIT 1");
+        $dev->execute();
+        $devRow = $dev->fetch();
+        return $devRow ? (int) $devRow['id'] : null;
+    }
+    return (int) $row['user_id'];
 }
 
 /**
@@ -56,6 +84,41 @@ function getUserIdFromToken() {
 function userScope($userId) {
     if ($userId === null || $userId === '') return '';
     return 'AND user_id = ' . (int) $userId;
+}
+
+/**
+ * Validate that a URL points to a public HTTP(S) host and is NOT an
+ * internal/private address (SSRF protection).
+ *
+ * Blocks: localhost, loopback, private ranges, link-local, reserved,
+ *         and IPv6 equivalents.
+ */
+function isSafeImageUrl($url) {
+    if (!is_string($url) || $url === '') return false;
+
+    $parsed = parse_url($url);
+    if ($parsed === false) return false;
+
+    // Only allow http/https schemes (blocks file://, gopher://, etc.)
+    $scheme = strtolower($parsed['scheme'] ?? '');
+    if ($scheme !== 'http' && $scheme !== 'https') return false;
+
+    $host = $parsed['host'] ?? '';
+    if ($host === '' || $host === 'localhost') return false;
+
+    // Resolve hostname to IP(s) and check each against private/reserved ranges.
+    // gethostbynamel returns array of IPs or false on failure.
+    $ips = gethostbynamel($host);
+    if ($ips === false || empty($ips)) return false;
+
+    foreach ($ips as $ip) {
+        // FILTER_FLAG_NO_PRIV_RANGE blocks 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16
+        // FILTER_FLAG_NO_RES_RANGE blocks 127.0.0.0/8, 169.254.0.0/16, 0.0.0.0/8, etc.
+        if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return false;
+        }
+    }
+    return true;
 }
 
 /**

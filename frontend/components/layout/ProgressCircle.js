@@ -3,6 +3,8 @@
  *
  * Smooth, mathematically exact SVG circular meter with configurable track,
  * stroke width and child content centered natively.
+ *
+ * Track uses surface-container-high (white tint), fill uses blue primary.
  */
 import React from 'react';
 import { View, StyleSheet } from 'react-native';

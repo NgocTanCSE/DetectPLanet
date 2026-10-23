@@ -16,14 +16,9 @@
  *   android/app/src/main/assets/fonts/
  *   (and mirrored to ios/AgriScan/fonts/ once iOS support is added)
  *
- *   Geist-Regular.ttf          → "Geist"
- *   Geist-Medium.ttf           → "Geist-Medium"
- *   Geist-SemiBold.ttf         → "Geist-SemiBold"
- *   Geist-Bold.ttf             → "Geist-Bold"
- *   PlusJakartaSans-Regular.ttf        → "PlusJakartaSans-Regular"
- *   PlusJakartaSans-Medium.ttf         → "PlusJakartaSans-Medium"
- *   PlusJakartaSans-SemiBold.ttf       → "PlusJakartaSans-SemiBold"
- *   PlusJakartaSans-Bold.ttf           → "PlusJakartaSans-Bold"
+ *   Inter-Regular.ttf   → "Inter-Regular"   (primary UI font — body text)
+ *   Inter-SemiBold.ttf  → "Inter-SemiBold"  (all UI text — labels, body, headings, icons)
+ *   Inter-Bold.ttf      → "Inter-Bold"      (headlines, hero text)
  */
 import { useEffect, useState } from 'react';
 

@@ -2,7 +2,7 @@
 # AgriScan AI — Unified Docker Compose (ALL services in ONE file)
 #
 # Services: PostgreSQL + PHP API (both start by default)
-# AI inference: Cloudflare Workers AI (@cf/meta/llama-3.2-11b-vision-instruct)
+# AI inference: Cloudflare Workers AI (@cf/meta/llama-4-scout-17b-16e-instruct)
 #
 # ── Single command to bring the entire system up: ──
 #     docker compose up --build -d                   # full stack (with PostgreSQL)
@@ -54,6 +54,10 @@ services:
     restart: unless-stopped
     ports:
       - "887:80"                   # Expose API on port 887 (matches app.json extra.apiUrl)
+      - "1887:80"                  # Second mapping used by the Google OAuth relay:
+                                   # Google blocks private-IP redirects, so dev uses
+                                   # http://localhost:1887/auth/google/callback
+                                   # with `adb reverse tcp:1887 tcp:1887`.
     env_file:
       - .env
     environment:
@@ -67,14 +71,16 @@ services:
       # Token needs: Account → Workers AI (Edit).
       CLOUDFLARE_ACCOUNT_ID: ${CLOUDFLARE_ACCOUNT_ID}
       CLOUDFLARE_API_TOKEN: ${CLOUDFLARE_API_TOKEN}
-      CLOUDFLARE_VISION_MODEL: ${CLOUDFLARE_VISION_MODEL:-@cf/meta/llama-3.2-11b-vision-instruct}
-      CLOUDFLARE_CHAT_MODEL: ${CLOUDFLARE_CHAT_MODEL:-@cf/meta/llama-3.1-8b-instruct-fp8}
+      CLOUDFLARE_VISION_MODEL: ${CLOUDFLARE_VISION_MODEL:-@cf/meta/llama-4-scout-17b-16e-instruct}
+      CLOUDFLARE_VISION_FALLBACK: ${CLOUDFLARE_VISION_FALLBACK:-@cf/meta/llama-4-scout-17b-16e-instruct}
+      CLOUDFLARE_CHAT_MODEL: ${CLOUDFLARE_CHAT_MODEL:-@cf/meta/llama-3.3-70b-instruct-fp8-fast}
       AI_TIMEOUT: ${AI_TIMEOUT:-90}
       # Optional legacy overrides (full URLs of a self-hosted AI worker):
       AI_ENDPOINT: ${AI_ENDPOINT:-}
       CHAT_ENDPOINT: ${CHAT_ENDPOINT:-}
       # Production mode — real AI only, no mock fallback when DB/AI is unavailable.
       AGRISCAN_DEMO: ${AGRISCAN_DEMO:-0}
+      REQUIRE_AUTH: ${REQUIRE_AUTH:-false}
       # Google OAuth
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
@@ -85,6 +91,35 @@ services:
       - ./db/api/uploads:/var/www/html/uploads
     depends_on:
       postgres: { condition: service_healthy, required: false }  # required:false so --scale postgres=0 works for serverless mode (API falls back to no-DB state)
+
+  # ── Scheduler — job nền (GĐ2: rủi ro thời tiết; GĐ3/GĐ4: tin chính thức, gom báo cáo)
+  # Cùng image với api, chỉ khác entrypoint. Mỗi 30 phút gọi `run.php loop`;
+  # job nào đã đến giờ (theo bảng job_runs) thì chạy.
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: agriscan-scheduler
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: ${DB_HOST:-postgres}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_NAME: ${DB_NAME:-agriscan}
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASS: ${DB_PASS:-postgres}
+      DB_DRIVER: ${DB_DRIVER:-pgsql}
+      WEATHER_ENABLED: ${WEATHER_ENABLED:-1}
+      OPEN_METEO_BASE: ${OPEN_METEO_BASE:-https://api.open-meteo.com/v1/forecast}
+      RISK_THRESHOLD: ${RISK_THRESHOLD:-40}
+      OFFICIAL_ENABLED: ${OFFICIAL_ENABLED:-0}
+    command: sh -c "while true; do php /var/www/html/jobs/run.php loop; sleep 1800; done"
+    healthcheck:
+      disable: true          # image api có HEALTHCHECK gọi Apache :80, scheduler chỉ chạy PHP CLI
+    depends_on:
+      postgres: { condition: service_healthy, required: false }
+      api: { condition: service_started, required: false }
 
 volumes:
   postgres_data:

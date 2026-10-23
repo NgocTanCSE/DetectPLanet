@@ -390,11 +390,18 @@ CREATE TABLE IF NOT EXISTS crop_disease_alerts (
   disease_label VARCHAR(128) NOT NULL,           -- hiển thị cho người dùng
   severity      VARCHAR(32)   NOT NULL DEFAULT 'warning' CHECK (severity IN ('healthy','warning','danger')),
   season_months VARCHAR(64)   NOT NULL DEFAULT '', -- '1,2,3,12' = tháng 1,2,3,12 (mùa bệnh)
+  province      VARCHAR(64)   NOT NULL DEFAULT '', -- '' = toàn quốc, hoặc tên tỉnh (34 đơn vị)
   description   TEXT        NOT NULL DEFAULT '', -- mô tả bệnh và triệu chứng
   recommendation TEXT       NOT NULL DEFAULT '', -- khuyên xử lý
   is_active     SMALLINT    NOT NULL DEFAULT 1 CHECK (is_active IN (0,1)),
   start_date    DATE        NULL,                -- bắt đầu hiệu lực (nếu có)
   end_date      DATE        NULL,                -- hết hiệu lực (nếu có)
+  source        VARCHAR(16) NOT NULL DEFAULT 'manual', -- manual | official | weather | community
+  risk_score    SMALLINT    NOT NULL DEFAULT 0,  -- 0-100 (chỉ cảnh báo thời tiết)
+  valid_from    DATE        NULL,                -- hiệu lực từ ngày
+  valid_to      DATE        NULL,                -- hết hiệu lực ngày (NULL = không hết hạn)
+  external_id   VARCHAR(160) NOT NULL DEFAULT '',-- khoá chống trùng cho job
+  source_url    VARCHAR(512) NOT NULL DEFAULT '',-- link nguồn (tin chính thức)
   created_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
@@ -402,9 +409,103 @@ CREATE TABLE IF NOT EXISTS crop_disease_alerts (
 CREATE INDEX IF NOT EXISTS idx_crop_alerts_crop ON crop_disease_alerts (crop_id);
 CREATE INDEX IF NOT EXISTS idx_crop_alerts_active ON crop_disease_alerts (is_active);
 CREATE INDEX IF NOT EXISTS idx_crop_alerts_season ON crop_disease_alerts (season_months);
+CREATE INDEX IF NOT EXISTS idx_crop_alerts_province ON crop_disease_alerts (province);
+CREATE INDEX IF NOT EXISTS idx_crop_alerts_valid_to ON crop_disease_alerts (valid_to);
+CREATE INDEX IF NOT EXISTS idx_crop_alerts_source ON crop_disease_alerts (source);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_crop_alerts_external
+  ON crop_disease_alerts (external_id) WHERE external_id <> '';
+
+-- =============================================================================
+-- 20b. Weather snapshots — cache dự báo Open-Meteo theo tỉnh (GĐ2)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS weather_snapshots (
+  id         BIGSERIAL PRIMARY KEY,
+  province   VARCHAR(64) NOT NULL,
+  fetched_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  forecast   JSONB       NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_weather_province_time
+  ON weather_snapshots (province, fetched_at DESC);
+
+-- =============================================================================
+-- 20b-2. Official ingest — tin chính thức chờ duyệt (GĐ3)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS official_ingest (
+  id            BIGSERIAL PRIMARY KEY,
+  source_url    VARCHAR(512)  NOT NULL,
+  title         TEXT          NOT NULL,
+  published_at  DATE          NULL,
+  province      VARCHAR(64)   NOT NULL DEFAULT '',
+  crop_slug     VARCHAR(32)   NOT NULL DEFAULT '',
+  disease_name  VARCHAR(128)  NOT NULL DEFAULT '',
+  disease_label VARCHAR(128)  NOT NULL DEFAULT '',
+  severity      VARCHAR(32)   NOT NULL DEFAULT 'warning',
+  summary       TEXT          NOT NULL DEFAULT '',
+  status        VARCHAR(16)   NOT NULL DEFAULT 'pending',
+  alert_id      VARCHAR(32)   NULL,
+  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reviewed_at   TIMESTAMP     NULL,
+  UNIQUE (source_url, disease_label, province)
+);
+CREATE INDEX IF NOT EXISTS idx_ingest_status ON official_ingest (status, created_at DESC);
+
+-- =============================================================================
+-- 20b-3. Báo cáo cộng đồng (GĐ4)
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS disease_reports (
+  id            VARCHAR(32)  PRIMARY KEY,
+  user_id       INTEGER      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  crop_id       INTEGER      NULL REFERENCES crops(id) ON DELETE SET NULL,
+  crop_slug     VARCHAR(32)  NOT NULL DEFAULT '',
+  disease_label VARCHAR(128) NOT NULL DEFAULT '',
+  province      VARCHAR(64)  NOT NULL DEFAULT '',
+  ward          VARCHAR(128) NOT NULL DEFAULT '',
+  note          TEXT         NOT NULL DEFAULT '',
+  image_url     VARCHAR(512) NOT NULL DEFAULT '',
+  lat           DECIMAL(9,6) NULL,
+  lon           DECIMAL(9,6) NULL,
+  status        VARCHAR(16)  NOT NULL DEFAULT 'pending',
+  created_at    TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_reports_cluster
+  ON disease_reports (province, crop_slug, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reports_user
+  ON disease_reports (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS disease_report_votes (
+  report_id  VARCHAR(32) NOT NULL REFERENCES disease_reports(id) ON DELETE CASCADE,
+  user_id    INTEGER     NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (report_id, user_id)
+);
+
+-- =============================================================================
+-- 20c. Job runs — trạng thái lần chạy gần nhất của từng job nền
+-- =============================================================================
+CREATE TABLE IF NOT EXISTS job_runs (
+  name             VARCHAR(48) PRIMARY KEY,
+  last_run_at      TIMESTAMP   NULL,
+  last_status      VARCHAR(16) NOT NULL DEFAULT '',
+  last_message     TEXT        NOT NULL DEFAULT '',
+  last_duration_ms INTEGER     NOT NULL DEFAULT 0
+);
 
 -- =============================================================================
 -- End of extended production schema (user management + document management + safety alerts)
 -- =============================================================================
 
 
+
+-- -----------------------------------------------------------------------------
+-- Chat history (per account). Created at runtime by ChatController as well,
+-- so existing databases pick it up without a manual migration.
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  role       VARCHAR(16) NOT NULL,          -- 'user' | 'assistant'
+  content    TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_chat_messages_user ON chat_messages (user_id, created_at);

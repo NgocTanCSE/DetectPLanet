@@ -24,22 +24,16 @@ import {
   Image,
   ScrollView,
   TouchableOpacity,
-  Share,
   StyleSheet,
   Alert,
-  Platform,
 } from 'react-native';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import { colors, typography, spacing, shadowFlat, z } from '../utils/theme';
+import { colors, typography, spacing, radius } from '../utils/theme';
 import Icon from '../icons';
-import AppHeader, { useTopInset, HEADER_HEIGHT } from '../components/layout/AppHeader';
 import { emptyCapture } from '../utils/dto';
-import { Button, Card, SectionHeader } from '../components';
-
-const modes = [
-  { key: 'single', label: 'Chụp trực tiếp' },
-  { key: 'multi', label: 'Chọn từ thư viện' },
-];
+import { CROP_OPTIONS, cropLabel } from '../utils/crops';
+import { Button, Card, ScreenHeader } from '../components';
+import { BOTTOM_NAV_HEIGHT } from '../components/layout/BottomNav';
 
 const CAMERA_QUALITY = 0.8;
 
@@ -125,15 +119,18 @@ function checkImageQuality(base64) {
 }
 
 // ── CameraScreen ────────────────────────────────────────────────────
+const TIPS = [
+  'Đặt lá trên nền sáng, tránh chụp ngược sáng.',
+  'Giữ toàn bộ lá trong khung hình, không quá xa.',
+  'Lấy nét rõ vùng có đốm bệnh hoặc héo úa.',
+];
+
 const CameraScreen = ({ navigation }) => {
-  const topInset = useTopInset();
-  const [mode, setMode] = useState('single');
-  const [flashOn, setFlashOn] = useState(false);
-  const [gridVisible, setGridVisible] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [captured, setCaptured] = useState(emptyCapture());
-  const [loading, setLoading] = useState(false);
   const [quality, setQuality] = useState(null);
+  // The vision model available on the current plan misidentifies the plant
+  // often, so the user confirms the crop before /analyze is called.
+  const [cropSlug, setCropSlug] = useState('');
 
   const onBack = () => navigation?.navigate?.('home');
 
@@ -144,9 +141,19 @@ const CameraScreen = ({ navigation }) => {
         mediaType: 'photo',
         quality: CAMERA_QUALITY,
         includeBase64: true,
+        // Downscale on device: a 12MP JPEG becomes ~4 MB base64, which slows
+        // vision inference past the server timeout and can exceed PHP's
+        // post_max_size. 1280px is plenty for leaf-level diagnosis.
+        maxWidth: 1280,
+        maxHeight: 1280,
         cameraType: 'back',
         saveToPhotos: false,
-        flashMode: flashOn ? 'on' : 'off',
+        // NOTE: react-native-image-picker v8 CameraOptions does NOT support
+        // a `flashMode` key (it's absent from the TS types). Passing it is
+        // ignored at best and can trigger native warnings on some Android
+        // vendor camera apps. The flashOn state is kept for UI-only purposes
+        // (toggle button appearance). System camera flash control would require
+        // a custom native camera module (e.g. react-native-camera-kit).
       });
 
       if (result.didCancel) return;
@@ -164,7 +171,6 @@ const CameraScreen = ({ navigation }) => {
         };
         setCaptured(newCapture);
         setQuality(checkImageQuality(newCapture.base64));
-        setShowPreview(true);
       }
     } catch (err) {
       Alert.alert(
@@ -181,6 +187,8 @@ const CameraScreen = ({ navigation }) => {
         mediaType: 'photo',
         quality: CAMERA_QUALITY,
         includeBase64: true,
+        maxWidth: 1280,
+        maxHeight: 1280,
         selectionLimit: 1,
       });
 
@@ -199,372 +207,234 @@ const CameraScreen = ({ navigation }) => {
         };
         setCaptured(newCapture);
         setQuality(checkImageQuality(newCapture.base64));
-        setShowPreview(true);
       }
     } catch (err) {
       Alert.alert('Không thể mở Thư viện ảnh', 'Vui lòng thử lại.');
     }
   };
 
-  // ── Shutter button handler (delegates to the active mode) ─────────────
-  const takePhoto = () => {
-    if (loading) return;
-    if (mode === 'multi') {
-      openImageLibrary();
-    } else {
-      captureFromSystemCamera();
-    }
-  };
-
   const onAnalyze = () => {
-    setShowPreview(false);
+    if (!cropSlug) return;
     navigation?.navigate?.('scan', {
       imageUri: captured.uri,
       base64: captured.base64,
+      crop: cropSlug,
+      cropLabel: cropLabel(cropSlug),
     });
   };
 
+  // "Chụp lại" chỉ xoá ảnh hiện tại để người dùng tự chọn máy ảnh / thư viện
+  // (trước đây nó mở lại camera ngay, gây bất ngờ và không thể đổi nguồn ảnh).
   const onRetake = () => {
-    setShowPreview(false);
+    setCaptured(emptyCapture());
     setQuality(null);
-    if (mode === 'multi') {
-      openImageLibrary();
-    } else {
-      captureFromSystemCamera();
-    }
-  };
-
-  const shareCamera = async () => {
-    try {
-      await Share.share({
-        message: 'AgriScan AI - Hình ảnh mẫu lá cây',
-        url: captured.uri || 'https://agriscan.ai',
-      });
-    } catch {
-      /* no-op */
-    }
-  };
-
-  // ── Feed area content ──────────────────────────────────────────────
-  const renderFeed = () => {
-    if (captured.uri) {
-      return (
-        <Image
-          source={{ uri: captured.uri }}
-          style={styles.feed}
-          resizeMode="cover"
-          onError={(e) => console.warn('Camera feed load error:', e.nativeEvent?.error)}
-        />
-      );
-    }
-    return (
-      <View style={[styles.feed, styles.feedPlaceholder]}>
-        <View style={styles.feedIcon}>
-          <Text style={[typography.body.sm, { color: colors.muted, textAlign: 'center' }]}>
-            {mode === 'multi'
-              ? 'Chọn ảnh từ thư viện'
-              : 'Chụp ảnh lá cây'}
-          </Text>
-        </View>
-      </View>
-    );
   };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader
-        title="Chụp ảnh mẫu lá"
-        showBack
+      <ScreenHeader
+        title="Quét mẫu lá"
+        subtitle={captured.uri ? 'Kiểm tra ảnh trước khi phân tích' : 'Chụp hoặc chọn ảnh lá cây'}
         onBack={onBack}
-        actions={[{ icon: 'share', label: 'Chia sẻ', onPress: shareCamera }]}
       />
 
       <ScrollView
         contentContainerStyle={{
-          paddingTop: topInset + HEADER_HEIGHT,
-          paddingBottom: 96,
+          paddingTop: spacing['space-lg'],
+          paddingBottom: BOTTOM_NAV_HEIGHT + spacing['space-lg'],
           paddingHorizontal: spacing.gutter,
-          gap: 12,
+          gap: spacing['space-md'],
         }}>
-        {/* Mode switcher & quick controls */}
-        <SectionHeader
-          title="Chế độ chụp"
-          actionLabel={mode === 'single' ? 'Chuyển thư viện' : 'Chuyển máy ảnh'}
-          onAction={() => {
-            setMode(mode === 'single' ? 'multi' : 'single');
-            setShowPreview(false);
-            setCaptured(emptyCapture());
-            setQuality(null);
-          }}
-        />
-
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <TouchableOpacity
-            accessibilityLabel="Bật tắt Flash"
-            activeOpacity={0.7}
-            onPress={() => setFlashOn((v) => !v)}
-            style={[styles.controlBtn, flashOn && { borderColor: colors.primary, backgroundColor: colors['primary-subtle'] }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Icon name={flashOn ? 'flash_on' : 'flash_off'} size={14} color={flashOn ? colors.primary : colors.muted} style={{ marginRight: 4 }} />
-              <Text style={[typography.body.sm, {
-                color: flashOn ? colors.primary : colors.muted,
-                fontWeight: '500',
-              }]}>
-                Flash
-              </Text>
-            </View>
-          </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityLabel="Lưới căn chỉnh"
-            activeOpacity={0.7}
-            onPress={() => setGridVisible((v) => !v)}
-            style={[styles.controlBtn, gridVisible && { borderColor: colors.primary, backgroundColor: colors['primary-subtle'] }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Icon name="grid_on" size={14} color={gridVisible ? colors.primary : colors.muted} style={{ marginRight: 4 }} />
-              <Text style={[typography.body.sm, {
-                color: gridVisible ? colors.primary : colors.muted,
-                fontWeight: '500',
-              }]}>
-                Lưới
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Guidance hint — text only */}
-        <View style={styles.guidanceBanner}>
-          <Text style={[typography.body.sm, { color: colors.muted, fontWeight: '500' }]}>
-            Đặt mẫu lá đủ ánh sáng và chi tiết rõ nét trước khi chụp
-          </Text>
-        </View>
-
-        {/* Feed area — no corner brackets, no viewfinder pill */}
+        {/* Khung ảnh */}
         <View style={styles.viewport}>
-          {renderFeed()}
-          {gridVisible && captured.uri && (
-            <View style={styles.gridOverlay} pointerEvents="none">
-              <View style={[styles.gridLine, { left: '33.33%' }]} />
-              <View style={[styles.gridLineV, { top: '33.33%' }]} />
-              <View style={[styles.gridLineV, { top: '66.66%' }]} />
-              <View style={[styles.gridLine, { left: '66.66%' }]} />
+          {captured.uri ? (
+            <Image
+              source={{ uri: captured.uri }}
+              style={styles.viewportImg}
+              resizeMode="cover"
+              onError={(e) => console.warn('Camera preview error:', e.nativeEvent?.error)}
+            />
+          ) : (
+            <View style={styles.placeholder}>
+              <View style={styles.placeholderIcon}>
+                <Icon name="photo_camera" size={26} color={colors.primary} />
+              </View>
+              <Text style={[typography.body.md, { color: colors.muted, textAlign: 'center' }]}>
+                Chưa có ảnh mẫu lá
+              </Text>
             </View>
           )}
         </View>
 
-        {/* Shutter & Controls Row — text only, no icons */}
-        <View style={styles.controlsRow}>
-          <View style={{ alignItems: 'center', gap: 4 }}>
-            <TouchableOpacity
-              accessibilityLabel="Chụp ảnh mẫu lá"
-              activeOpacity={0.88}
-              onPress={takePhoto}
-              style={styles.shutterButton}>
-              <Icon name="photo_camera" size={24} color={colors['on-primary']} />
-            </TouchableOpacity>
-            <Text style={[typography.body.sm, { color: colors.muted, fontWeight: '500' }]}>
-              Chụp ảnh
+        {/* Chất lượng ảnh */}
+        {captured.uri && quality ? (
+          <View style={styles.qualityRow}>
+            <View
+              style={[
+                styles.qualityDot,
+                { backgroundColor: quality.isGood ? colors.primary : colors['status-warning'] },
+              ]}
+            />
+            <Text style={[typography.body.sm, { color: colors['on-surface'], flex: 1 }]}>
+              {quality.message}
             </Text>
           </View>
+        ) : null}
 
-          <TouchableOpacity
-            accessibilityLabel="Lưới căn chỉnh"
-            activeOpacity={0.7}
-            onPress={() => setGridVisible((v) => !v)}
-            style={[styles.sideControlBtn, {
-              backgroundColor: gridVisible ? colors['primary-subtle'] : colors['surface-container-low'],
-            }]}>
-            <Text style={[typography.body.sm, {
-              color: gridVisible ? colors.primary : colors.muted,
-              fontWeight: gridVisible ? '600' : '400',
-            }]}>
-              Lưới {gridVisible ? 'Bật' : 'Tắt'}
+        {/* Loại cây — bắt buộc chọn trước khi phân tích */}
+        {captured.uri ? (
+          <Card style={{ gap: 10 }} padding={14}>
+            <Text style={[typography.label.lg, { color: colors['on-surface'] }]}>
+              Đây là cây gì?
             </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Preview bottom sheet — text only, includes Image Quality Check */}
-        {showPreview ? (
-          <Card style={[styles.previewSheet, shadowFlat]} padding={16}>
-            <View style={styles.previewHandle} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-              <Text style={[typography.headline.sm, { color: colors['on-surface'] }]}>
-                Kiểm tra ảnh mẫu lá
+            <Text style={[typography.body.sm, { color: colors.muted }]}>
+              Chọn đúng loại cây để AI chẩn đoán đúng bệnh.
+            </Text>
+            <View style={styles.cropWrap}>
+              {CROP_OPTIONS.map((opt) => {
+                const selected = cropSlug === opt.slug;
+                return (
+                  <TouchableOpacity
+                    key={opt.slug}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected }}
+                    accessibilityLabel={opt.label}
+                    onPress={() => setCropSlug(opt.slug)}
+                    style={[styles.cropChip, selected && styles.cropChipSelected]}>
+                    <Text
+                      style={[
+                        typography.body.sm,
+                        { color: selected ? colors['on-primary'] : colors['on-surface-variant'] },
+                      ]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {!cropSlug ? (
+              <Text style={[typography.body.sm, { color: colors.muted }]}>
+                Chọn một loại cây để mở khoá nút phân tích.
               </Text>
-              {quality && (
-                <View style={[
-                  styles.qualityBadge,
-                  { backgroundColor: quality.isGood ? colors['primary-subtle'] : colors['surface-container-low'] },
-                ]}>
-                  <Text style={[
-                    typography.body.sm,
-                    { color: quality.isGood ? colors.primary : colors.muted, fontWeight: '700' },
-                  ]}>
-                    {quality.message}
-                  </Text>
-                </View>
-              )}
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center' }}>
-              <Image source={{ uri: captured.uri }} style={styles.previewThumb} resizeMode="cover"
-                onError={(e) => console.warn('Camera preview error:', e.nativeEvent?.error)} />
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '700' }]}>
-                  Mẫu bệnh phẩm
-                </Text>
-                <Text style={[typography.body.sm, { color: colors.muted, marginTop: 2 }]} numberOfLines={2}>
-                  Ảnh đủ độ sáng và chi tiết rõ nét. Nhấn "Phân tích ngay" để bắt đầu nhận diện.
-                </Text>
-              </View>
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-              <Button variant="outline" onPress={onRetake} style={styles.retakeBtn} accessibilityLabel="Chụp lại">
-                Chụp lại
-              </Button>
-              <Button variant="primary" onPress={onAnalyze} style={styles.analyzeBtn} accessibilityLabel="Phân tích ngay">
-                Phân tích ngay
-              </Button>
-            </View>
+            ) : null}
           </Card>
         ) : null}
+
+        {/* Hành động chính */}
+        {captured.uri ? (
+          <View style={styles.actionRow}>
+            <Button
+              variant="outline"
+              onPress={onRetake}
+              style={styles.actionBtn}
+              accessibilityLabel="Chọn ảnh khác">
+              Chọn ảnh khác
+            </Button>
+            <Button
+              variant="primary"
+              onPress={onAnalyze}
+              disabled={!cropSlug}
+              style={styles.actionBtn}
+              accessibilityLabel="Phân tích ảnh này">
+              Phân tích ngay
+            </Button>
+          </View>
+        ) : (
+          <View style={styles.actionRow}>
+            <Button
+              variant="primary"
+              iconName="photo_camera"
+              onPress={captureFromSystemCamera}
+              style={styles.actionBtn}
+              accessibilityLabel="Chụp ảnh mẫu lá">
+              Chụp ảnh
+            </Button>
+            <Button
+              variant="outline"
+              iconName="photo_library"
+              onPress={openImageLibrary}
+              style={styles.actionBtn}
+              accessibilityLabel="Chọn ảnh từ thư viện">
+              Thư viện
+            </Button>
+          </View>
+        )}
+
+        {/* Hướng dẫn chụp */}
+        <Card style={{ gap: 8 }} padding={14}>
+          <Text style={[typography.label.lg, { color: colors['on-surface'] }]}>
+            Để có kết quả chính xác
+          </Text>
+          {TIPS.map((tip) => (
+            <View key={tip} style={styles.tipRow}>
+              <View style={styles.tipDot} />
+              <Text style={[typography.body.sm, { color: colors.muted, flex: 1 }]}>{tip}</Text>
+            </View>
+          ))}
+        </Card>
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  guidanceBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors['surface-container-low'],
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.outline,
-  },
   viewport: {
-    position: 'relative',
     width: '100%',
-    aspectRatio: 4 / 4.6,
-    borderRadius: 8,
+    aspectRatio: 4 / 4.4,
+    borderRadius: radius.md,
     overflow: 'hidden',
-    backgroundColor: colors['surface-container-high'],
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: colors['surface-container-low'],
     borderWidth: 1,
     borderColor: colors.outline,
-  },
-  feed: { width: '100%', height: '100%' },
-  feedPlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors['surface-container-low'],
   },
-  feedIcon: {
-    alignItems: 'center',
+  viewportImg: { width: '100%', height: '100%' },
+  cropWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
-  gridOverlay: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0, bottom: 0,
-    pointerEvents: 'none',
-  },
-  gridLine: {
-    position: 'absolute',
-    top: 0, bottom: 0,
-    width: 1,
-    backgroundColor: colors.outline,
-    opacity: 0.3,
-  },
-  gridLineV: {
-    position: 'absolute',
-    left: 0, right: 0,
-    height: 1,
-    backgroundColor: colors.outline,
-    opacity: 0.3,
-  },
-  controlsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 12,
-  },
-  sideControlBtn: {
-    alignItems: 'center',
-    paddingHorizontal: 10,
+  cropChip: {
+    paddingHorizontal: 14,
     paddingVertical: 8,
-  },
-  controlBtn: {
-    width: 44,
-    height: 36,
-    borderRadius: 6,
+    borderRadius: 999,
+    backgroundColor: colors['surface-container-low'] || colors.surface,
     borderWidth: 1,
     borderColor: colors.outline,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
   },
-  shutterButton: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  cropChipSelected: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  placeholder: { alignItems: 'center', gap: 10, padding: 24 },
+  placeholderIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.paper,
+    backgroundColor: colors['primary-subtle'],
   },
-  retakeBtn: {
-    flex: 1,
+  qualityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: radius.md,
     backgroundColor: colors['surface-container-low'],
-    borderRadius: 8,
-    paddingVertical: 12,
   },
-  analyzeBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
+  qualityDot: { width: 6, height: 6, borderRadius: 3 },
+  actionRow: { flexDirection: 'row', gap: spacing['space-sm'] },
+  actionBtn: { flex: 1 },
+  tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  tipDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginTop: 7,
     backgroundColor: colors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-  },
-  previewSheet: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.paper,
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
-    maxHeight: '40%',
-  },
-  previewHandle: {
-    width: 40,
-    height: 4,
-    backgroundColor: colors.outline,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
-  previewThumb: {
-    width: 72,
-    height: 72,
-    borderRadius: 6,
-  },
-  qualityBadge: {
-    alignSelf: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
   },
 });
 

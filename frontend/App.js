@@ -16,10 +16,10 @@ import {
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { colors, typography } from "./utils/theme";
 import BottomNav from "./components/layout/BottomNav";
-import AppHeader from "./components/layout/AppHeader";
 import { useFonts } from "./hooks/useFonts";
 import { verifySession, onAuthStateChanged } from "./services/auth";
 import LoginScreen from "./screens/LoginScreen";
+import ScreenTransition from "./components/motion/ScreenTransition";
 
 // Splash screen is handled natively via the SplashTheme (android
 // windowBackground drawable + delayed background clear in MainActivity.onCreate).
@@ -79,52 +79,98 @@ import ResultScreen from "./screens/ResultScreen";
 import HistoryScreen from "./screens/HistoryScreen";
 import ChatScreen from "./screens/ChatScreen";
 import AlertScreen from "./screens/AlertScreen";
+import ReportScreen from "./screens/ReportScreen";
+import NotificationsScreen from "./screens/NotificationsScreen";
 
-  // Maps a screen key -> the bottom-tab that should appear "active"
+  // Maps a screen key -> the bottom-tab that should appear "active".
+  // The 4 tabs are home / scan / chat / settings. Lịch sử (history),
+  // Cảnh báo (alerts) và Cẩm nang (guides) are sub-screens reached from
+  // Trang chủ + Cài đặt, so they keep "home" highlighted on the nav bar.
   const SCREEN_TO_TAB = {
     home: "home",
     camera: "scan",
     scan: "scan",
     result: "scan",
-    guides: "guides",
+    guides: "home",
     chat: "chat",
     settings: "settings",
-    alerts: "alerts",
+    alerts: "home",
+    history: "home",
+    report: "home",
+    notifications: "home",
   };
 
 // Real screens for the remaining nav tabs (were placeholders before)
 import GuidesScreen from "./screens/GuidesScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 
+// ── Chuyển trang ─────────────────────────────────────────────────────────
+// Mỗi màn thuộc một "cột" tab; so sánh chỉ số để biết nên trượt sang phải
+// (đi sâu) hay sang trái (quay lại). Màn không có trong bảng (Lịch sử, Cảnh
+// báo, Cẩm nang, Báo dịch, Thông báo) được coi là màn con.
+const SCREEN_TAB_INDEX = {
+  home: 0,
+  scan: 1,
+  camera: 1,
+  result: 1,
+  chat: 2,
+  settings: 3,
+};
+
+function getTransitionDirection(from, to) {
+  if (from === to) return "tab";
+  const fromIdx = SCREEN_TAB_INDEX[from];
+  const toIdx = SCREEN_TAB_INDEX[to];
+  // Tab -> màn con, hoặc màn con -> màn con khác: đi sâu.
+  if (toIdx === undefined) return "forward";
+  // Màn con -> tab: quay lại.
+  if (fromIdx === undefined) return "back";
+  // Đổi tab: theo thứ tự trái -> phải.
+  return toIdx > fromIdx ? "forward" : "back";
+}
+
 // ── Auth gate ───────────────────────────────────────────────────────────
-// The Google OAuth flow is fully implemented (auth.js + LoginScreen +
-// /auth/google backend). The gate is OFF by default so the app is usable
-// without Google credentials; flip it on for production by setting
-// REQUIRE_AUTH=true in .env (consumed by react-native-config at build time)
-// once GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET are configured. NO fake user
-// is ever injected.
+// Mặc định app mở thẳng Trang chủ và cho phép dùng như khách; người dùng tự
+// đăng nhập Google trong Cài đặt khi muốn đồng bộ nhật ký / gửi báo dịch.
+//
+// Đặt REQUIRE_LOGIN=true trong .env nếu muốn chặn ngay ở màn Login (dùng khi
+// cần buộc định danh, ví dụ chạy thử nghiệm báo cáo cộng đồng). JS đọc biến
+// này lúc chạy nên chỉ cần reload Metro, không phải build lại APK.
 function isAuthRequired() {
   try {
     const Config = require('react-native-config');
-    return Config && Config.REQUIRE_AUTH === 'true';
+    if (Config && Config.REQUIRE_LOGIN === 'true') return true;
   } catch {
-    return false;
+    /* react-native-config chưa cài → không chặn người dùng */
   }
+  return false;
 }
-const REQUIRE_AUTH = isAuthRequired();
+const REQUIRE_LOGIN = isAuthRequired();
 
 export default function App() {
   const { loaded: fontsLoaded } = useFonts();
   const [screen, setScreen] = useState("home");
   const [params, setParams] = useState({});
   const [user, setUser] = useState(null);
-  const [authReady, setAuthReady] = useState(!REQUIRE_AUTH);
+  const [authReady, setAuthReady] = useState(!REQUIRE_LOGIN);
+  // Hướng chuyển trang: 'forward' (đi sâu), 'back' (quay lại), 'tab' (đổi tab).
+  // Dùng cho <ScreenTransition> để trượt đúng chiều.
+  const [transitionDir, setTransitionDir] = useState("tab");
+
+  const goTo = (nextScreen, nextParams = {}) => {
+    setTransitionDir(getTransitionDirection(screen, nextScreen));
+    setParams(nextParams);
+    setScreen(nextScreen);
+  };
 
   // BottomNav is hidden on the full-screen camera flow and on the result
   // screen (result has its own quick action bar). It stays available on all
   // other tabbed routes including scan so the user can navigate away after
   // analysis.
-  const hideBottomNav = screen === "camera" || screen === "result";
+  // Only the full-screen task flows (đang phân tích / kết quả) hide the nav.
+  // The camera screen is a form (not a live viewfinder), so the 4 tabs stay
+  // reachable there instead of leaving the user with a single back arrow.
+  const hideBottomNav = screen === "scan" || screen === "result";
   // ── Android hardware back handler ─────────────────────────────────────
   useEffect(() => {
     const handleBack = () => {
@@ -138,9 +184,13 @@ export default function App() {
           chat: "home",
           settings: "home",
           alerts: "home",
+          report: "alerts",
+          notifications: "home",
         };
         setParams({});
-        setScreen(prevMap[screen] || "home");
+        const target = prevMap[screen] || "home";
+        setTransitionDir(getTransitionDirection(screen, target));
+        setScreen(target);
         return true;
       }
       return false;
@@ -149,18 +199,17 @@ export default function App() {
     return () => subscription.remove();
   }, [screen]);
 
-  // Check persisted session on startup (only when the gate is on)
+  // Khôi phục phiên đã lưu (nếu có). Khi không bắt buộc đăng nhập, việc này
+  // chỉ để Trang chủ / Cài đặt hiện đúng tên và avatar.
   useEffect(() => {
-    if (!REQUIRE_AUTH) return;
     verifySession().then((u) => {
       setUser(u);
       setAuthReady(true);
     });
   }, []);
 
-  // Subscribe to auth changes (only when the gate is on)
+  // Đồng bộ trạng thái đăng nhập giữa các màn hình (đăng nhập / đăng xuất).
   useEffect(() => {
-    if (!REQUIRE_AUTH) return;
     const unsub = onAuthStateChanged((u) => setUser(u));
     return unsub;
   }, []);
@@ -170,8 +219,7 @@ export default function App() {
     screen,
     params,
     navigate: (nextScreen, nextParams = {}) => {
-      setParams(nextParams);
-      setScreen(nextScreen);
+      goTo(nextScreen, nextParams);
     },
   };
 
@@ -204,6 +252,12 @@ export default function App() {
     case "alerts":
       ActiveScreen = AlertScreen;
       break;
+    case "report":
+      ActiveScreen = ReportScreen;
+      break;
+    case "notifications":
+      ActiveScreen = NotificationsScreen;
+      break;
     default:
       ActiveScreen = HomeScreen;
   }
@@ -212,7 +266,7 @@ export default function App() {
   // usable without Google credentials, so render the Home screen directly.
   // Only fall back to Login when auth is actually required AND we have no
   // verified session yet.
-  if (REQUIRE_AUTH && (!authReady || !user)) {
+  if (REQUIRE_LOGIN && (!authReady || !user)) {
     const loginNav = {
       navigate: (nextScreen, nextParams = {}) => {
         setParams(nextParams);
@@ -238,7 +292,9 @@ export default function App() {
       <SafeAreaProvider>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <StatusBar barStyle="dark-content" backgroundColor={colors.paper} />
-          <ActiveScreen navigation={navigation} route={{ params }} />
+          <ScreenTransition key={screen} direction={transitionDir}>
+            <ActiveScreen navigation={navigation} route={{ params }} />
+          </ScreenTransition>
           {/* BottomNav is hidden on the full-screen task flows (camera / scan) so it
               cannot overlap the camera shutter and the analysis preview sheet's
               "Phân tích ngay" button. It stays available on ALL tabbed routes
@@ -249,8 +305,7 @@ export default function App() {
             <BottomNav
               activeTab={SCREEN_TO_TAB[screen] || "home"}
               onTabPress={(tab) => {
-                setParams({});
-                setScreen(tab);
+                goTo(tab);
               }}
             />
           )}

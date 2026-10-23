@@ -9,6 +9,24 @@ require_once __DIR__ . '/../services/ai.php';
 require_once __DIR__ . '/../middleware/rate_limit.php';
 
 class ScanController {
+    /**
+     * Crops the app lets the user confirm before analysis. The vision model
+     * available on the current Workers plan misidentifies plants often, so the
+     * confirmed slug is injected into the prompt as a fixed constraint.
+     * Keep slugs in sync with frontend/utils/crops.js.
+     */
+    private const CROP_HINTS = [
+        'rice'      => ['label' => 'Lúa',        'scientific' => 'Oryza sativa'],
+        'tomato'    => ['label' => 'Cà chua',    'scientific' => 'Solanum lycopersicum'],
+        'maize'     => ['label' => 'Ngô',        'scientific' => 'Zea mays'],
+        'potato'    => ['label' => 'Khoai tây',  'scientific' => 'Solanum tuberosum'],
+        'coffee'    => ['label' => 'Cà phê',     'scientific' => 'Coffea arabica'],
+        'pepper'    => ['label' => 'Hồ tiêu',    'scientific' => 'Piper nigrum'],
+        'soybean'   => ['label' => 'Đậu nành',   'scientific' => 'Glycine max'],
+        'vegetable' => ['label' => 'Rau cải',    'scientific' => 'Brassica'],
+        'other'     => ['label' => 'Cây khác',   'scientific' => ''],
+    ];
+
     public function handle($method) {
         if ($method === 'GET') {
             $this->handleGetScanSession();
@@ -79,6 +97,13 @@ class ScanController {
             return;
         }
 
+        // Crop confirmed by the user in the app (see frontend/utils/crops.js).
+        $cropSlug = strtolower(trim((string) ($body['crop'] ?? '')));
+        $cropHint = null;
+        if ($cropSlug !== '' && isset(self::CROP_HINTS[$cropSlug]) && $cropSlug !== 'other') {
+            $cropHint = ['slug' => $cropSlug] + self::CROP_HINTS[$cropSlug];
+        }
+
         $imageUri  = $body['imageUri'] ?? '';
         $rawBase64 = $body['base64'] ?? '';
         if (!$rawBase64 && preg_match('#^data:image/(\w+);base64,(.+)$#si', $imageUri, $m)) {
@@ -86,6 +111,13 @@ class ScanController {
         }
 
         if (!$rawBase64 && $imageUri !== '' && preg_match('#^https?://#i', $imageUri)) {
+            if (!isSafeImageUrl($imageUri)) {
+                sendJson([
+                    'error'   => 'Invalid image URL',
+                    'message' => 'URL ảnh không hợp lệ hoặc trỏ đến địa chỉ nội bộ.',
+                ], 400);
+                return;
+            }
             $imgCtx = stream_context_create(['http' => ['timeout' => 20, 'ignore_errors' => true]]);
             $bytes  = @file_get_contents($imageUri, false, $imgCtx);
             if ($bytes !== false && strlen($bytes) > 0 && strlen($bytes) <= 10 * 1024 * 1024) {
@@ -111,10 +143,21 @@ class ScanController {
         }
 
         $filename = 'leaf_' . bin2hex(random_bytes(6)) . '.jpg';
-        $dest = __DIR__ . '/../../uploads/' . $filename;
-        if (!is_dir(__DIR__ . '/../../uploads')) {
-            @mkdir(__DIR__ . '/../../uploads', 0775, true);
+
+        // The web root layout differs between local dev (repo/api) and the
+        // container (/var/www/html). Resolve the first writable "uploads"
+        // directory instead of hard-coding ../../uploads, which pointed at
+        // /var/www/uploads — owned by root, so PHP (www-data) could never
+        // write there and every /analyze call failed with "Upload failed".
+        $uploadDir = $this->resolveUploadDir();
+        if ($uploadDir === null) {
+            sendJson([
+                'error'   => 'Upload dir unavailable',
+                'message' => 'Máy chủ chưa sẵn sàng để lưu ảnh. Vui lòng thử lại sau.',
+            ], 500);
+            return;
         }
+        $dest = $uploadDir . '/' . $filename;
         if (@file_put_contents($dest, $decoded) === false) {
             sendJson([
                 'error'   => 'Upload failed',
@@ -128,7 +171,7 @@ class ScanController {
                   || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https' : 'http';
         $imageUri = "$proto://$host/uploads/$filename";
 
-        $diag = aiDiagnose('data:image/jpeg;base64,' . $rawBase64);
+        $diag = aiDiagnose('data:image/jpeg;base64,' . $rawBase64, $cropHint);
         if (!$diag['ok']) {
             sendJson([
                 'error'   => 'Dịch vụ AI không phản hồi',
@@ -138,8 +181,9 @@ class ScanController {
         }
         $pred = $diag['prediction'];
 
-        $finalCrop      = $pred['crop'];
-        $finalCropLabel = $pred['crop_label'];
+        // A confirmed crop always wins over the model's guess.
+        $finalCrop      = $cropHint ? $cropHint['slug'] : $pred['crop'];
+        $finalCropLabel = $cropHint ? $cropHint['label'] : $pred['crop_label'];
         $finalDisease   = $pred['disease_label'];
         $severity       = $pred['severity'];
         $confidence     = $pred['confidence'];
@@ -196,5 +240,31 @@ class ScanController {
             'detections'     => array_map('mapDetection', $dets->fetchAll()),
             'topk'           => $pred['topk'],
         ]);
+    }
+
+    /**
+     * Return a writable directory for uploaded leaf photos (public /uploads).
+     * Order: UPLOAD_DIR env → <web-root>/uploads → <project>/uploads.
+     */
+    private function resolveUploadDir() {
+        $candidates = [
+            getenv('UPLOAD_DIR') ?: null,
+            dirname(__DIR__) . '/uploads',        // /var/www/html/uploads in Docker
+            dirname(__DIR__, 2) . '/uploads',     // repo/api/uploads in local dev
+        ];
+
+        foreach ($candidates as $dir) {
+            if (!$dir) {
+                continue;
+            }
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0775, true);
+            }
+            if (is_dir($dir) && is_writable($dir)) {
+                return rtrim($dir, '/');
+            }
+        }
+
+        return null;
     }
 }

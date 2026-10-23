@@ -24,6 +24,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zip \
     && rm -rf /var/lib/apt/lists/*
 
+# Upload / execution limits for phone photos + vision inference.
+# Defaults (upload_max_filesize=2M, post_max_size=8M, max_execution_time=30)
+# reject or kill real 12MP captures — the API returned "Không thể phân tích
+# phản hồi của model" whenever inference passed 30s.
+RUN printf 'upload_max_filesize=32M\npost_max_size=32M\nmemory_limit=256M\nmax_execution_time=180\nmax_input_time=180\n' \
+    > /usr/local/etc/php/conf.d/zz-agriscan.ini
+
 # Enable Apache mod_rewrite for clean URLs + AllowOverride so .htaccess works
 RUN a2enmod rewrite \
     && sed -i 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
@@ -32,6 +39,7 @@ RUN a2enmod rewrite \
 RUN mkdir -p /var/www/html/uploads && chown -R www-data:www-data /var/www/html/uploads
 
 # Copy API source files
+COPY api/router.php /var/www/html/router.php
 COPY api/index.php /var/www/html/index.php
 COPY api/config.php /var/www/html/config.php
 COPY api/.htaccess /var/www/html/.htaccess
@@ -39,6 +47,8 @@ COPY api/routes /var/www/html/routes
 COPY api/controllers /var/www/html/controllers
 COPY api/middleware /var/www/html/middleware
 COPY api/services /var/www/html/services
+COPY api/jobs /var/www/html/jobs
+COPY api/tests /var/www/html/tests
 COPY api/uploads/ /var/www/html/uploads/
 
 # Set proper permissions on code

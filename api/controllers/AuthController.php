@@ -8,11 +8,18 @@ require_once __DIR__ . '/../services/database.php';
 require_once __DIR__ . '/../middleware/rate_limit.php';
 
 class AuthController {
+    /** Deep link the app listens for after the browser round-trip. */
+    const APP_DEEP_LINK = 'com.agriscan.ai://auth';
+
     public function handle($method, $target) {
         global $pdo, $GOOGLE;
 
         if ($method === 'GET' && $target === 'auth/me') {
             $this->handleMe();
+        } elseif ($method === 'GET' && $target === 'auth/google/start') {
+            $this->handleGoogleStart();
+        } elseif ($method === 'GET' && $target === 'auth/google/callback') {
+            $this->handleGoogleCallback();
         } elseif ($method === 'POST' && $target === 'auth/google') {
             $this->handleGoogle();
         } elseif ($method === 'POST' && $target === 'auth/logout') {
@@ -80,12 +87,140 @@ class AuthController {
             return;
         }
 
-        if ($GOOGLE['client_id'] === '' || $GOOGLE['client_secret'] === '') {
+        try {
+            $session = $this->googleExchange($code, $GOOGLE['redirect_uri']);
+        } catch (Exception $e) {
             sendJson([
-                'error'   => 'Google OAuth not configured',
-                'message' => 'Server chưa cấu hình GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.',
-            ], 503);
+                'error'   => 'Google token exchange failed',
+                'message' => $e->getMessage(),
+            ], 502);
             return;
+        }
+
+        sendJson($session);
+    }
+
+    /**
+     * GET /auth/google/start
+     * Opens the Google consent screen with an http(s) redirect that Google
+     * accepts for a "Web application" OAuth client. Custom schemes such as
+     * com.agriscan.ai://auth are rejected by Google for this client type, so
+     * the code comes back to /auth/google/callback and we hand it to the app
+     * through a deep link.
+     */
+    private function handleGoogleStart() {
+        global $GOOGLE;
+        if ($GOOGLE['client_id'] === '') {
+            $this->failBrowser('Server chưa cấu hình GOOGLE_CLIENT_ID.');
+            return;
+        }
+
+        $redirect = $this->callbackUrl();
+        $state = $this->signState();
+        $url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query([
+            'client_id'     => $GOOGLE['client_id'],
+            'redirect_uri'  => $redirect,
+            'response_type' => 'code',
+            'scope'         => 'openid email profile',
+            'access_type'   => 'offline',
+            'prompt'        => 'consent',
+            'state'         => $state,
+        ]);
+
+        header('Location: ' . $url, true, 302);
+        exit;
+    }
+
+    /**
+     * GET /auth/google/callback?code=...&state=...
+     * Exchanges the code server-side, creates a session and deep-links back
+     * into the app (com.agriscan.ai://auth?token=...).
+     */
+    private function handleGoogleCallback() {
+        global $GOOGLE;
+
+        $error = $_GET['error'] ?? '';
+        if ($error !== '') {
+            $this->deepLinkBack(['error' => $error, 'error_description' => $_GET['error_description'] ?? $error]);
+            return;
+        }
+
+        if (!$this->verifyState($_GET['state'] ?? '')) {
+            $this->deepLinkBack(['error' => 'invalid_state']);
+            return;
+        }
+
+        $code = $_GET['code'] ?? '';
+        if ($code === '') {
+            $this->deepLinkBack(['error' => 'missing_code']);
+            return;
+        }
+
+        try {
+            $session = $this->googleExchange($code, $this->callbackUrl());
+        } catch (Exception $e) {
+            $this->deepLinkBack(['error' => 'exchange_failed', 'error_description' => $e->getMessage()]);
+            return;
+        }
+
+        $this->deepLinkBack(['token' => $session['token']]);
+    }
+
+    /** Public URL Google must call back (must match Google Cloud Console). */
+    private function callbackUrl() {
+        global $GOOGLE;
+        if (preg_match('#^https?://#i', (string) $GOOGLE['redirect_uri'])) {
+            return $GOOGLE['redirect_uri'];
+        }
+        $host  = $_SERVER['HTTP_HOST'] ?? 'localhost:887';
+        $proto = ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                  || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') ? 'https' : 'http';
+        return $proto . '://' . $host . '/auth/google/callback';
+    }
+
+    private function deepLinkBack(array $params) {
+        $url = self::APP_DEEP_LINK . '?' . http_build_query($params);
+        header('Location: ' . $url, true, 302);
+        exit;
+    }
+
+    private function failBrowser($message) {
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">'
+           . '<body style="font-family:system-ui;padding:32px">'
+           . '<h3>Không thể đăng nhập</h3><p>' . htmlspecialchars($message, ENT_QUOTES, 'UTF-8') . '</p></body>';
+        exit;
+    }
+
+    /** Stateless CSRF state: "<ts>.<hmac>", valid for 10 minutes. */
+    private function signState() {
+        global $GOOGLE;
+        $ts  = time();
+        $sig = hash_hmac('sha256', (string) $ts, $GOOGLE['client_secret']);
+        return $ts . '.' . $sig;
+    }
+
+    private function verifyState($state) {
+        global $GOOGLE;
+        if (!is_string($state) || strpos($state, '.') === false) return false;
+        [$ts, $sig] = explode('.', $state, 2);
+        if (!ctype_digit($ts) || (time() - (int) $ts) > 600) return false;
+        $expected = hash_hmac('sha256', $ts, $GOOGLE['client_secret']);
+        return hash_equals($expected, $sig);
+    }
+
+    /**
+     * Exchange an authorization code for Google tokens, verify the id_token,
+     * upsert the user and create a 7-day session.
+     *
+     * @return array{token:string,user:array}
+     * @throws Exception on any Google/DB failure
+     */
+    private function googleExchange($code, $redirectUri) {
+        global $pdo, $GOOGLE;
+
+        if ($GOOGLE['client_id'] === '' || $GOOGLE['client_secret'] === '') {
+            throw new Exception('Server chưa cấu hình GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET.');
         }
 
         $tokenResp = @file_get_contents('https://oauth2.googleapis.com/token', false, stream_context_create([
@@ -97,38 +232,34 @@ class AuthController {
                     'client_secret' => $GOOGLE['client_secret'],
                     'code'          => $code,
                     'grant_type'    => 'authorization_code',
-                    'redirect_uri'  => $GOOGLE['redirect_uri'],
+                    'redirect_uri'  => $redirectUri,
                 ]),
                 'timeout' => 15,
             ]
         ]));
 
         if ($tokenResp === false) {
-            sendJson(['error' => 'Google token exchange failed'], 502);
-            return;
+            throw new Exception('Không gọi được Google token endpoint.');
         }
 
-        $tokenData = json_decode($tokenResp, true);
+        $tokenData = json_decode($tokenResp, true) ?: [];
         $idToken = $tokenData['id_token'] ?? '';
         if (!$idToken) {
-            sendJson(['error' => 'No id_token in Google response'], 401);
-            return;
+            $detail = $tokenData['error_description'] ?? $tokenData['error'] ?? 'Không nhận được id_token.';
+            throw new Exception($detail);
         }
 
         $verifyResp = @file_get_contents('https://oauth2.googleapis.com/tokeninfo?id_token=' . urlencode($idToken));
         if ($verifyResp === false) {
-            sendJson(['error' => 'Google token verification failed'], 401);
-            return;
+            throw new Exception('Không xác thực được Google token.');
         }
 
-        $payload = json_decode($verifyResp, true);
-        if (!isset($payload['sub']) || !isset($payload['email'])) {
-            sendJson(['error' => 'Invalid Google token payload'], 401);
-            return;
+        $payload = json_decode($verifyResp, true) ?: [];
+        if (!isset($payload['sub'], $payload['email'])) {
+            throw new Exception('Google token thiếu thông tin người dùng.');
         }
         if (isset($payload['aud']) && $payload['aud'] !== $GOOGLE['client_id']) {
-            sendJson(['error' => 'Token audience mismatch'], 401);
-            return;
+            throw new Exception('Token không thuộc client_id đã cấu hình.');
         }
 
         $googleId = $payload['sub'];
@@ -155,10 +286,10 @@ class AuthController {
         $stmt = $pdo->prepare("INSERT INTO sessions (id, user_id, expires_at) VALUES (?, ?, ?)");
         $stmt->execute([$token, $userId, $expiresAt]);
 
-        sendJson([
+        return [
             'token' => $token,
             'user'  => ['email' => $email, 'name' => $name, 'avatar' => $avatar],
-        ]);
+        ];
     }
 
     private function handleLogout() {

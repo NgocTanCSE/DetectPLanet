@@ -19,21 +19,33 @@ import {
   TouchableOpacity,
   StyleSheet,
   Share,
-  Linking,
   Platform,
-  Alert,
 } from 'react-native';
 import { colors, typography, spacing, shadowFlat } from '../utils/theme';
-import AppHeader, { useTopInset, HEADER_HEIGHT } from '../components/layout/AppHeader';
+import Icon from '../icons';
 import ProgressCircle from '../components/layout/ProgressCircle';
 import { emptyReport } from '../utils/dto';
 import { fetchResultReport } from '../services/api';
 import { saveReport, unsaveReport } from '../services/storage';
-import { Button, Badge, Card, SectionHeader } from '../components';
+import { Button, Badge, Card, SectionHeader, ScreenHeader } from '../components';
 import { BOTTOM_NAV_HEIGHT } from '../components/layout/BottomNav';
+import { useCountUp } from '../utils/motion';
+
+/** Vòng tròn độ tin cậy: đếm 0 → giá trị thật, chỉ component này re-render. */
+const ConfidenceGauge = ({ value }) => {
+  const animated = useCountUp(value, { duration: 750, delay: 120 });
+  return (
+    <ProgressCircle progress={animated} size={72} strokeWidth={5}>
+      <Text
+        numberOfLines={1}
+        style={{ color: colors.primary, fontWeight: '700', fontFamily: 'Inter-Bold', fontSize: 16 }}>
+        {value ? `${Math.round(animated)}%` : '-'}
+      </Text>
+    </ProgressCircle>
+  );
+};
 
 const ResultScreen = ({ navigation, route }) => {
-  const topInset = useTopInset();
   const scanId = navigation?.params?.scanId || route?.params?.scanId || '';
   const [isZoomed, setZoomed] = useState(false);
   const [isSaved, setSaved] = useState(false);
@@ -105,102 +117,139 @@ const ResultScreen = ({ navigation, route }) => {
     }
   };
 
-  const callExpert = async () => {
-    const phone = 'tel:18006868';
-    try {
-      const can = await Linking.canOpenURL(phone);
-      if (can) {
-        await Linking.openURL(phone);
-      } else {
-        setToast({ visible: true, message: 'Tổng đài hỗ trợ: 1800 6868' });
-      }
-    } catch {
-      setToast({ visible: true, message: 'Không thể gọi tổng đài hỗ trợ.' });
-    }
-    setTimeout(() => setToast({ visible: false, message: '' }), 2500);
+  // Chuyển nguyên kết quả chẩn đoán sang màn Chat để hỏi đáp tiếp với AI.
+  const askAI = () => {
+    navigation?.navigate?.('chat', {
+      scanContext: {
+        at: Date.now(),
+        id: report.id,
+        crop: report.crop,
+        disease: report.disease,
+        pathogen: report.pathogen,
+        severity: report.severity,
+        confidence: report.confidence,
+        recommendation: report.recommendation,
+      },
+    });
+  };
+
+  // Báo dịch ngoài đồng — prefill cây + bệnh từ kết quả chẩn đoán.
+  const reportDisease = () => {
+    navigation?.navigate?.('report', {
+      crop: report.crop,
+      diseaseLabel: report.disease,
+    });
   };
 
   const sevInfo = severityBanner(report.severity);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader
+      <ScreenHeader
         title="Chi tiết chẩn đoán"
-        showBack
         onBack={onBack}
-        actions={[
-          { icon: isSaved ? 'bookmark' : 'bookmark_border', label: isSaved ? 'Đã lưu' : 'Lưu', onPress: onSave },
-          { icon: 'share', label: 'Chia sẻ', onPress: shareResult },
-        ]}
+        right={
+          <>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel={isSaved ? 'Bỏ lưu báo cáo' : 'Lưu báo cáo'}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={onSave}
+              style={{ padding: 6 }}>
+              <Icon
+                name={isSaved ? 'bookmark' : 'bookmark_border'}
+                size={18}
+                color={isSaved ? colors.primary : colors.muted}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Chia sẻ kết quả"
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              onPress={shareResult}
+              style={{ padding: 6 }}>
+              <Icon name="share" size={18} color={colors.muted} />
+            </TouchableOpacity>
+          </>
+        }
       />
 
       <ScrollView
         contentContainerStyle={{
-          paddingTop: topInset + HEADER_HEIGHT,
+          paddingTop: spacing['space-lg'],
           paddingBottom: 130,
           paddingHorizontal: spacing.gutter,
           gap: 14,
         }}>
-        {/* Leaf image viewport — no eco icon placeholder */}
-        <View style={[styles.leafWrap, isZoomed && { overflow: 'visible' }]}>
-          {report.image ? (
+        {/* Leaf image viewport — only when the scan actually has a photo.
+            A empty 4:3 box with floating confidence badges (độ chính xác theo
+            vùng) is meaningless without pixels underneath, so we degrade to a
+            single compact info row instead. */}
+        {report.image ? (
+          <View style={[styles.leafWrap, isZoomed && { overflow: 'visible' }]}>
             <Image
               source={{ uri: report.image }}
               style={[styles.leafImg, isZoomed && { transform: [{ scale: 1.4 }] }]}
               resizeMode="cover"
               onError={(e) => console.warn('Result image load error:', e.nativeEvent?.error)}
             />
-          ) : (
-            <View style={[styles.leafImg, {
-              backgroundColor: colors['surface-container-low'],
-              alignItems: 'center',
-              justifyContent: 'center',
-            }]}>
-              <Text style={[typography.body.sm, { color: colors.muted }]}>Chưa có ảnh mẫu</Text>
-            </View>
-          )}
 
-          {/* Detections — confidence badges with green border, no icons */}
-          {(report.detections || []).map((d) => (
-            <View key={d.id} style={[styles.detBox, {
-              top: d.top, left: d.left,
-              borderColor: colors.primary,
-              backgroundColor: 'rgba(0, 108, 73, 0.15)',
-            }]}>
-              <Text style={[typography.label.sm, {
-                color: colors['on-primary'],
-                backgroundColor: colors.primary,
-                paddingHorizontal: 5,
-                paddingVertical: 1,
-                borderRadius: 4,
-                fontWeight: '700',
+            {/* Detections — confidence badges with green border, no icons */}
+            {(report.detections || []).map((d) => (
+              <View key={d.id} style={[styles.detBox, {
+                top: d.top, left: d.left,
+                borderColor: colors.primary,
+                backgroundColor: colors['primary-subtle'],
               }]}>
-                {d.confidence}
+                <Text style={[typography.label.sm, {
+                  color: colors['on-primary'],
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 5,
+                  paddingVertical: 1,
+                  borderRadius: 4,
+                  fontWeight: '700',
+                }]}>
+                  {d.confidence}
+                </Text>
+              </View>
+            ))}
+
+            {/* Plant tag — green dot + text */}
+            <View style={styles.leafBadge}>
+              <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
+              <Text style={[typography.body.sm, { color: colors['on-surface'], fontWeight: '700' }]} numberOfLines={1}>
+                {report.crop || 'Cây trồng'}
               </Text>
             </View>
-          ))}
 
-          {/* Plant tag — green dot + leaf icon + text */}
-          <View style={styles.leafBadge}>
-            <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
-            <Text style={[typography.body.sm, { color: colors['on-surface'], fontWeight: '700' }]} numberOfLines={1}>
-              {report.crop || 'Cây trồng'} #{report.id || '-'}
-            </Text>
-          </View>
-
-          {/* Zoom toggle — text + icon */}
-          <TouchableOpacity
-            accessibilityLabel="Phóng to"
-            activeOpacity={0.8}
-            onPress={() => setZoomed((v) => !v)}
-            style={styles.leafZoomBtn}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {/* Zoom toggle — text only */}
+            <TouchableOpacity
+              accessibilityLabel={isZoomed ? 'Thu nhỏ ảnh' : 'Phóng to ảnh'}
+              activeOpacity={0.8}
+              onPress={() => setZoomed((v) => !v)}
+              style={styles.leafZoomBtn}>
               <Text style={[typography.body.sm, { color: colors['on-surface'], fontWeight: '600' }]}>
                 {isZoomed ? 'Thu nhỏ' : 'Phóng to'}
               </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Card
+            padding={12}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={[styles.noImageIcon, { backgroundColor: colors['surface-container-low'] }]}>
+              <Icon name="document_scanner" size={18} color={colors.muted} />
             </View>
-          </TouchableOpacity>
-        </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '600' }]} numberOfLines={1}>
+                {report.crop || 'Cây trồng'} #{report.id || '-'}
+              </Text>
+              <Text style={[typography.body.sm, { color: colors.muted }]}>
+                Mẫu quét này không lưu ảnh lá
+              </Text>
+            </View>
+          </Card>
+        )}
 
         {/* Primary Diagnosis Card — flat, border-only */}
         <Card style={styles.card} padding={16}>
@@ -212,7 +261,7 @@ const ResultScreen = ({ navigation, route }) => {
                 {report.crop || 'Cây trồng'} — {report.disease || 'Chưa xác định'}
               </Text>
 
-              {report.pathogen ? (
+              {report.pathogen && report.pathogen !== '—' && report.pathogen !== '-' ? (
                 <Text style={[typography.body.sm, { color: colors.muted, fontStyle: 'italic', marginTop: 2 }]}>
                   Tên khoa học: {report.pathogen}
                 </Text>
@@ -221,18 +270,13 @@ const ResultScreen = ({ navigation, route }) => {
 
             {/* Confidence Gauge (ProgressCircle kept — data viz) */}
             <View style={{ alignItems: 'center' }}>
-              <ProgressCircle progress={report.confidence ? Number(report.confidence) : 0} size={64} strokeWidth={5}>
-                <Text style={[typography['metric-confidence'], { color: colors.primary, fontWeight: '700' }]}>
-                  {report.confidence ? `${report.confidence}%` : '-'}
-                </Text>
-              </ProgressCircle>
+              <ConfidenceGauge value={Number(report.confidence) || 0} />
               <Text style={[typography.body.sm, { color: colors.muted, marginTop: 4 }]}>Độ tin cậy</Text>
             </View>
           </View>
 
           {/* Status Matrix — text + colored dot */}
-          <SectionHeader title="" subtitle="" style={{ marginTop: 14, marginBottom: 0 }} />
-          <View style={styles.statusMatrix}>
+          <View style={[styles.statusMatrix, { marginTop: 14 }]}>
             <View style={styles.statusCell}>
               <View style={[styles.statusCellDot, { backgroundColor: colors['status-warning'] }]} />
               <Text style={[typography.body.sm, { color: colors.muted }]}>Mức độ lây lan</Text>
@@ -259,7 +303,9 @@ const ResultScreen = ({ navigation, route }) => {
 
         {/* Treatment Protocol Accordion — numbered indicators, no icons */}
         <View style={{ gap: 8 }}>
-          <SectionHeader title="Phác đồ can thiệp" />
+          <SectionHeader
+            title={report.severity === 'healthy' ? 'Chăm sóc & phòng bệnh' : 'Phác đồ can thiệp'}
+          />
 
           {report.accordion.length === 0 ? (
             <Card style={styles.accordionEmpty} padding={16}>
@@ -295,7 +341,7 @@ const ResultScreen = ({ navigation, route }) => {
                       </View>
                     </View>
                     <View style={styles.chevronWrap}>
-                      <View style={[styles.chevronIcon, { transform: [{ rotate: isOpen ? '180deg' : '0deg' }] }]} />
+                      <View style={[styles.chevronIcon, { transform: [{ rotate: isOpen ? '135deg' : '-45deg' }] }]} />
                     </View>
                   </TouchableOpacity>
 
@@ -335,7 +381,7 @@ const ResultScreen = ({ navigation, route }) => {
           )}
         </View>
 
-        {/* Consult card — green dot mark instead of support_agent icon */}
+        {/* Consult card — chuyển kết quả sang trợ lý AI để hỏi đáp */}
         <Card style={styles.consultCard} padding={16}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <View style={[styles.consultIconWrap, { backgroundColor: colors['primary-subtle'] }]}>
@@ -343,27 +389,34 @@ const ResultScreen = ({ navigation, route }) => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={[typography.headline.sm, { color: colors['on-surface'], fontWeight: '700' }]}>
-                Tư vấn khuyến nông
+                Tư vấn AI
               </Text>
               <Text style={[typography.body.sm, { color: colors.muted, marginTop: 2 }]}>
-                Trao đổi trực tiếp với kỹ sư nông nghiệp địa phương
+                Hỏi tiếp về cách xử lý và phòng bệnh cho mẫu lá này
               </Text>
             </View>
           </View>
 
           <Button
             variant="outline"
-            onPress={callExpert}
+            onPress={askAI}
             style={styles.consultBtn}
-            accessibilityLabel="Gọi tổng đài hỗ trợ miễn phí">
-            Gọi tổng đài hỗ trợ miễn phí (1800 6868)
+            accessibilityLabel="Hỏi AI về kết quả chẩn đoán này">
+            Hỏi AI về kết quả này
+          </Button>
+          <Button
+            variant="text"
+            onPress={reportDisease}
+            iconName="send"
+            style={{ marginTop: 4 }}
+            accessibilityLabel="Báo dịch ngoài đồng cho cộng đồng">
+            Báo dịch ngoài đồng
           </Button>
         </Card>
       </ScrollView>
 
       {/* Fixed bottom action bar — text only, no icon buttons.
-          Only unique actions remain: "Quét mẫu lá khác" (primary) + "Chia sẻ".
-          The save/bookmark action lives in the AppHeader (avoid duplication). */}
+          Save/bookmark action now lives in the inline title bar (avoid duplication). */}
       <View style={styles.quickBar}>
         <Button
           variant="primary"
@@ -396,6 +449,13 @@ const ResultScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   statusDot: { width: 6, height: 6, borderRadius: 3 },
+  noImageIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   leafWrap: {
     position: 'relative',
     width: '100%',
@@ -416,7 +476,7 @@ const styles = StyleSheet.create({
   },
   leafBadge: {
     position: 'absolute',
-    top: 10,
+    bottom: 10,
     left: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -438,8 +498,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors['surface-container-low'],
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.outline,
   },
   card: {
     borderRadius: 8,
@@ -533,8 +591,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    borderWidth: 1,
-    borderColor: colors.outline,
     marginTop: 8,
   },
   quickBar: {
@@ -559,8 +615,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.outline,
     paddingVertical: 12,
   },
   quickSaveBtn: {
@@ -570,8 +624,6 @@ const styles = StyleSheet.create({
     height: 42,
     paddingHorizontal: 12,
     borderRadius: 6,
-    borderWidth: 1,
-    borderColor: colors.outline,
   },
   toast: {
     position: 'absolute',
@@ -584,8 +636,6 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     borderRadius: 6,
     backgroundColor: colors['primary-fixed'],
-    borderWidth: 1,
-    borderColor: colors.outline,
   },
 });
 

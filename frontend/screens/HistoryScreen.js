@@ -7,11 +7,14 @@
  * instead of the old segmented SVG bar.
  */
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, Image, ScrollView, TextInput, StyleSheet, Linking } from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, ScrollView, StyleSheet, Linking } from 'react-native';
 import { colors, typography, spacing } from '../utils/theme';
-import AppHeader, { useTopInset, HEADER_HEIGHT } from '../components/layout/AppHeader';
+import Icon from '../icons';
+import { BOTTOM_NAV_HEIGHT } from '../components/layout/BottomNav';
 import { fetchHistory } from '../services/api';
-import { Pill, Badge, SectionHeader, EmptyState, Card, Input } from '../components';
+import { Pill, Badge, SectionHeader, EmptyState, Card, Input, ScreenHeader } from '../components';
+import { FadeInView } from '../components/motion';
+import { staggerDelay } from '../utils/motion';
 
 const severityMap = {
   danger: { label: 'Nguy hiểm', severity: 'danger' },
@@ -25,11 +28,18 @@ const HistoryRecord = ({ record, onPress }) => {
     <View style={styles.recordWrapper}>
       <TouchableOpacity activeOpacity={0.9} onPress={onPress} style={styles.record}>
         <View style={styles.recordImgWrap}>
-          <Image source={{ uri: record.image }} style={styles.recordImg} resizeMode="cover"
-            onError={(e) => console.warn('History image error:', e.nativeEvent?.error)} />
-          <View style={styles.recordIdBadge}>
-            <Text style={styles.recordIdText}>{record.id}</Text>
-          </View>
+          {record.image ? (
+            <Image
+              source={{ uri: record.image }}
+              style={styles.recordImg}
+              resizeMode="cover"
+              onError={(e) => console.warn('History image error:', e.nativeEvent?.error)}
+            />
+          ) : (
+            <View style={[styles.recordImg, styles.recordImgEmpty]}>
+              <Icon name="document_scanner" size={18} color={colors.muted} />
+            </View>
+          )}
         </View>
         <View style={{ flex: 1, minWidth: 0, paddingLeft: 10 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
@@ -53,7 +63,6 @@ const HistoryRecord = ({ record, onPress }) => {
 };
 
 const HistoryScreen = ({ navigation }) => {
-  const topInset = useTopInset();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [records, setRecords] = useState([]);
@@ -65,7 +74,16 @@ const HistoryScreen = ({ navigation }) => {
         const d = await fetchHistory();
         setRecords(d.records || []);
         if (Array.isArray(d.filters) && d.filters.length > 0) {
-          setFilters(d.filters.map((f) => ({ key: f.key, label: f.label })));
+          // API có thể trả về nhiều filter cùng key (mỗi bản ghi một dòng) —
+          // lọc trùng để React không cảnh báo "two children with the same key".
+          const seen = new Set();
+          const unique = [];
+          d.filters.forEach((f) => {
+            if (!f || !f.key || seen.has(f.key)) return;
+            seen.add(f.key);
+            unique.push({ key: f.key, label: f.label });
+          });
+          setFilters(unique);
         }
       } catch {
         /* no backend */
@@ -100,18 +118,26 @@ const HistoryScreen = ({ navigation }) => {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <AppHeader
+      <ScreenHeader
         title="Nhật ký chẩn đoán"
-        subtitle="Lịch sử"
-        showBack
+        subtitle={`${records.length} mẫu lá đã quét`}
         onBack={() => navigation?.navigate?.('home')}
-        actions={[{ icon: 'settings', label: 'Cài đặt', onPress: () => Linking.openSettings() }]}
+        right={
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Cài đặt hệ thống"
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => Linking.openSettings()}
+            style={{ padding: 6 }}>
+            <Icon name="settings" size={18} color={colors.muted} />
+          </TouchableOpacity>
+        }
       />
 
       <ScrollView
         contentContainerStyle={{
-          paddingTop: topInset + HEADER_HEIGHT,
-          paddingBottom: 96,
+          paddingTop: spacing['space-md'],
+          paddingBottom: BOTTOM_NAV_HEIGHT + spacing['space-xl'],
           paddingHorizontal: spacing.gutter,
           gap: 12,
         }}>
@@ -190,12 +216,13 @@ const HistoryScreen = ({ navigation }) => {
           {filtered.length === 0 ? (
             <EmptyState message="Không tìm thấy mẫu quét phù hợp." />
           ) : null}
-          {filtered.map((r) => (
-            <HistoryRecord
-              key={r.id}
-              record={r}
-              onPress={() => navigation?.navigate?.('result', { scanId: r.id })}
-            />
+          {filtered.map((r, index) => (
+            <FadeInView key={r.id} delay={staggerDelay(index)} translateY={10}>
+              <HistoryRecord
+                record={r}
+                onPress={() => navigation?.navigate?.('result', { scanId: r.id })}
+              />
+            </FadeInView>
           ))}
         </View>
       </ScrollView>
@@ -228,12 +255,10 @@ const styles = StyleSheet.create({
   record: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors['surface-container-low'],
     borderRadius: 8,
     padding: 10,
     gap: 10,
-    borderWidth: 1,
-    borderColor: colors.outline,
   },
   recordImgWrap: {
     position: 'relative',
@@ -245,20 +270,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
   },
   recordImg: { width: '100%', height: '100%' },
-  recordIdBadge: {
-    position: 'absolute',
-    bottom: 3,
-    right: 3,
-    backgroundColor: 'rgba(20, 20, 20, 0.75)',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  recordIdText: {
-    color: '#ffffff',
-    fontSize: 9,
-    fontWeight: '700',
-  },
+  recordImgEmpty: { alignItems: 'center', justifyContent: 'center' },
 });
 
 export default HistoryScreen;

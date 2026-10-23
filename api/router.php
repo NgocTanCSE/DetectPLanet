@@ -13,6 +13,10 @@ require_once __DIR__ . '/controllers/GuidesController.php';
 require_once __DIR__ . '/controllers/AuthController.php';
 require_once __DIR__ . '/controllers/ChatController.php';
 require_once __DIR__ . '/controllers/AlertController.php';
+require_once __DIR__ . '/controllers/JobController.php';
+require_once __DIR__ . '/controllers/AdminController.php';
+require_once __DIR__ . '/controllers/ReportController.php';
+require_once __DIR__ . '/controllers/NotificationsController.php';
 
 /**
  * Route an incoming request to the appropriate controller.
@@ -23,9 +27,32 @@ function routeRequest($method, $target) {
     if ($method === 'GET') {
         if ($target === 'health') {
             global $AI, $pdo;
+
+            // Trạng thái các job nền (GĐ2+) — bảng có thể chưa tồn tại ở DB cũ.
+            $jobs = [];
+            if ($pdo !== null) {
+                try {
+                    $rows = $pdo->query(
+                        "SELECT name, last_run_at, last_status, last_message, last_duration_ms
+                           FROM job_runs ORDER BY name"
+                    )->fetchAll();
+                    foreach ($rows as $r) {
+                        $jobs[$r['name']] = [
+                            'lastRunAt'  => $r['last_run_at'],
+                            'status'     => $r['last_status'],
+                            'message'    => $r['last_message'],
+                            'durationMs' => (int) $r['last_duration_ms'],
+                        ];
+                    }
+                } catch (Throwable $e) {
+                    $jobs = ['_error' => 'job_runs chưa sẵn sàng'];
+                }
+            }
+
             sendJson([
                 'status' => 'ok',
                 'db'     => $pdo !== null,
+                'jobs'   => $jobs,
                 'ai'     => [
                     'configured'   => ($AI['account_id'] !== '' && $AI['api_token'] !== '')
                                        || $AI['endpoint'] !== '',
@@ -62,8 +89,15 @@ function routeRequest($method, $target) {
             return true;
         }
 
-        if ($target === 'auth/me') {
+        if ($target === 'auth/me'
+            || $target === 'auth/google/start'
+            || $target === 'auth/google/callback') {
             (new AuthController())->handle('GET', $target);
+            return true;
+        }
+
+        if ($target === 'chat/history') {
+            (new ChatController())->handle('GET', $target);
             return true;
         }
 
@@ -74,6 +108,36 @@ function routeRequest($method, $target) {
 
         if ($target === 'user-crop-preferences') {
             (new AlertController())->handle('GET', $target);
+            return true;
+        }
+
+        if ($target === 'user-location') {
+            (new AlertController())->handle('GET', $target);
+            return true;
+        }
+
+        if ($target === 'admin/ingest') {
+            (new AdminController())->handle('GET', $target);
+            return true;
+        }
+
+        if ($target === 'reports') {
+            (new ReportController())->handle('GET', $target);
+            return true;
+        }
+
+        if ($target === 'notifications') {
+            (new NotificationsController())->handle('GET', $target);
+            return true;
+        }
+
+        if ($target === 'notifications/unread-count') {
+            (new NotificationsController())->handle('GET', $target);
+            return true;
+        }
+
+        if ($target === 'admin/reports') {
+            (new AdminController())->handle('GET', $target);
             return true;
         }
 
@@ -89,6 +153,11 @@ function routeRequest($method, $target) {
         }
 
         if ($target === 'user-crop-preferences') {
+            (new AlertController())->handle('POST', $target);
+            return true;
+        }
+
+        if ($target === 'user-location') {
             (new AlertController())->handle('POST', $target);
             return true;
         }
@@ -110,10 +179,65 @@ function routeRequest($method, $target) {
         }
 
         if ($target === 'chat') {
-            (new ChatController())->handle();
+            (new ChatController())->handle('POST', 'chat');
             return true;
         }
 
+        if ($target === 'chat/history/clear') {
+            (new ChatController())->handle('POST', $target);
+            return true;
+        }
+
+        if ($target === 'jobs/run') {
+            (new JobController())->handle($target);
+            return true;
+        }
+
+        if ($target === 'admin/ingest') {
+            (new AdminController())->handle('POST', $target);
+            return true;
+        }
+
+        if ($target === 'admin/ingest/fetch') {
+            (new AdminController())->handle('POST', $target);
+            return true;
+        }
+
+        if (preg_match('#^admin/ingest/(\d+)/(approve|reject)$#', $target)) {
+            (new AdminController())->handle('POST', $target);
+            return true;
+        }
+
+        if ($target === 'reports') {
+            (new ReportController())->handle('POST', $target);
+            return true;
+        }
+
+        if (preg_match('#^reports/([A-Za-z0-9_]+)/confirm$#', $target)) {
+            (new ReportController())->handle('POST', $target);
+            return true;
+        }
+
+        if ($target === 'notifications/read') {
+            (new NotificationsController())->handle('POST', $target);
+            return true;
+        }
+
+        if (preg_match('#^admin/reports/([A-Za-z0-9_]+)/(verify|reject)$#', $target)) {
+            (new AdminController())->handle('POST', $target);
+            return true;
+        }
+
+        sendJson(['error' => 'not found'], 404);
+        return true;
+    }
+
+    // DELETE routes
+    if ($method === 'DELETE') {
+        if (preg_match('#^reports/([A-Za-z0-9_]+)$#', $target)) {
+            (new ReportController())->handle('DELETE', $target);
+            return true;
+        }
         sendJson(['error' => 'not found'], 404);
         return true;
     }

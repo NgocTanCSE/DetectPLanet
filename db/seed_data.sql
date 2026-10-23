@@ -20,10 +20,20 @@ ON CONFLICT (google_id) DO NOTHING;
 
 
 -- 1. Crops (reference data — ids 1=rice, 2=tomato, 3=fruit are assumed below)
+--    Bộ 10 dòng khớp với api/services/schema.php::agriscanCrops() và
+--    frontend/utils/crops.js (9 lựa chọn quét; 'fruit' chỉ để tương thích dữ liệu cũ,
+--    'other' bị ẩn khỏi danh sách theo dõi).
 INSERT INTO crops (slug, name, label, icon) VALUES
-  ('rice', 'Lúa nước', 'Lúa', 'eco'),
-  ('tomato', 'Cà chua', 'Cà chua', 'nature'),
-  ('fruit', 'Trái cây', 'Trái cây', 'apple')
+  ('rice',      'Lúa nước',  'Lúa',        'eco'),
+  ('tomato',    'Cà chua',   'Cà chua',    'nature'),
+  ('fruit',     'Trái cây',  'Trái cây',   'apple'),
+  ('maize',     'Ngô',       'Ngô',        'eco'),
+  ('potato',    'Khoai tây', 'Khoai tây',  'eco'),
+  ('coffee',    'Cà phê',    'Cà phê',     'eco'),
+  ('pepper',    'Hồ tiêu',   'Hồ tiêu',    'eco'),
+  ('soybean',   'Đậu nành',  'Đậu nành',   'nature'),
+  ('vegetable', 'Rau cải',   'Rau cải',    'nature'),
+  ('other',     'Cây khác',  'Cây khác',   'eco')
 ON CONFLICT (slug) DO NOTHING;
 
 -- 2. Articles (home "tips & alerts" cards)
@@ -34,20 +44,20 @@ INSERT INTO articles (id, image, label, label_color, time, title, action, tag_bg
   ('art-005', '', 'Mới', '#EF4444', '46 phút trước', 'Mẹo: Phòng tránh Bệnh Hư hỏng cà chua bằng nhà kính nhỏ', 'read', '#F8D7DA'),
   ('art-006', '', 'Mới', '#EF4444', '47 phút trước', 'Phòng tránh Bệnh Ném Sinh bằng phủ xanh', 'watch', '#F8D7DA'),
   ('art-007', '', 'Mới', '#EF4444', '11 phút trước', 'Dự báo thời tiết và sâu bệnh tuần tới', 'read', '#F8D7DA'),
-  ('art-008', '', 'Mới', '#EF4444', '6 ngày trước', 'Dự báo thời tiết và sâu bệnh tuần tới', 'watch', '#F8D7DA'),
-  ('art-009', '', 'Cảnh báo', '#F59E0B', '6 ngày trước', 'Cập nhật: Bệnh Đốm Nâu mùa hè nóng', 'watch', '#FEF3C7'),
-  ('art-010', '', 'Mới', '#EF4444', '2 ngày trước', 'Dự báo thời tiết và sâu bệnh tuần tới', 'learn', '#F8D7DA'),
-  ('art-011', '', 'Kinh nghiệm', '#10B981', '7 ngày trước', 'Phòng tránh Bệnh Ném Sinh bằng phủ xanh', 'read', '#DBEAFE'),
-  ('art-012', '', 'Mới', '#EF4444', '2 ngày trước', 'Bệnh vàng lá trên dâu: phòng tránh ngay', 'learn', '#F8D7DA'),
-  ('art-013', '', 'Cảnh báo', '#F59E0B', '4 ngày trước', 'Bản tin sâu bệnh tuần 38: Cảnh báo Đốm Tím lúa', 'read', '#FEF3C7'),
-  ('art-014', '', 'Cảnh báo', '#F59E0B', '7 ngày trước', 'Hướng dẫn chụp ảnh lá chẩn đoán chính xác 98%', 'read', '#FEF3C7'),
-  ('art-015', '', 'Mới', '#EF4444', '7 ngày trước', 'Top 5 loại thuốc bảo vệ thực vật sinh học', 'learn', '#F8D7DA'),
-  ('art-016', '', 'Mới', '#EF4444', '4 ngày trước', 'Cách nhận biết sớm Bệnh Cháy Lá lúa', 'watch', '#F8D7DA'),
-  ('art-017', '', 'Mới', '#EF4444', '7 ngày trước', 'Chiến lược đánh bật sâu rệp bằng bẫy màu', 'read', '#F8D7DA'),
-  ('art-018', '', 'Mới', '#EF4444', '2 ngày trước', 'Kỹ thuật tẩm thuốc sinh học cho vườn nhà', 'watch', '#F8D7DA'),
-  ('art-019', '', 'Mới', '#EF4444', '3 ngày trước', 'Bệnh viêm đốm cà chua: Nguyên nhân & xử trí tức thì', 'read', '#F8D7DA'),
-  ('art-020', '', 'Mới', '#EF4444', '3 ngày trước', 'Cách truyền thống trồng lúa dòng kháng hạn', 'watch', '#F8D7DA'),
-  ('art-021', '', 'Cảnh báo', '#F59E0B', '2 ngày trước', 'So sánh 5 dòng cà chua kháng bệnh tại VN', 'learn', '#FEF3C7')
+  ('art-008', '', 'Mới', '#EF4444', '6 ngày trước', 'Bản tin sâu bệnh tuần 38: Cảnh báo Đốm Tím lúa', 'watch', '#F8D7DA'),
+  ('art-009', '', 'Cảnh báo', '#F59E0B', '4 ngày trước', 'Hướng dẫn dùng AgriScan AI trên smartphone', 'learn', '#FEF3C7'),
+  ('art-010', '', 'Mới', '#EF4444', '4 ngày trước', 'AI dự báo sớm sâu rệp trái cây', 'read', '#F8D7DA'),
+  ('art-011', '', 'Kinh nghiệm', '#10B981', '5 ngày trước', 'Dự báo thời tiết và sâu bệnh tuần tới', 'learn', '#DBEAFE'),
+  ('art-012', '', 'Kinh nghiệm', '#10B981', '6 ngày trước', 'Phòng tránh Bệnh Ném Sinh bằng phủ xanh', 'read', '#DBEAFE'),
+  ('art-013', '', 'Mới', '#EF4444', '2 ngày trước', 'Bệnh viêm đốm cà chua: Nguyên nhân & xử trí tức thì', 'learn', '#F8D7DA'),
+  ('art-014', '', 'Kinh nghiệm', '#10B981', '5 ngày trước', 'Phòng tránh Bệnh Ném Sinh bằng phủ xanh', 'learn', '#DBEAFE'),
+  ('art-015', '', 'Mới', '#EF4444', '2 ngày trước', 'So sánh 5 dòng cà chua kháng bệnh tại VN', 'learn', '#F8D7DA'),
+  ('art-016', '', 'Kinh nghiệm', '#10B981', '3 ngày trước', 'Mẹo: Phòng tránh Bệnh Hư hỏng cà chua bằng nhà kính nhỏ', 'read', '#DBEAFE'),
+  ('art-017', '', 'Kinh nghiệm', '#10B981', '7 ngày trước', 'Top 5 loại thuốc bảo vệ thực vật sinh học', 'learn', '#DBEAFE'),
+  ('art-018', '', 'Mới', '#EF4444', '4 ngày trước', 'So sánh 5 dòng cà chua kháng bệnh tại VN', 'learn', '#F8D7DA'),
+  ('art-019', '', 'Cảnh báo', '#F59E0B', '2 ngày trước', 'Cách nhận biết sớm Bệnh Cháy Lá lúa', 'watch', '#FEF3C7'),
+  ('art-020', '', 'Kinh nghiệm', '#10B981', '3 ngày trước', 'Kỹ thuật tẩm thuốc sinh học cho vườn nhà', 'read', '#DBEAFE'),
+  ('art-021', '', 'Mới', '#EF4444', '2 ngày trước', 'Chiến lược luân hóa 3 năm tăng năng suất lúa', 'read', '#F8D7DA')
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. Guides (result detail accordion + /guides)

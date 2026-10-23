@@ -5,7 +5,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors, radius, typography, spacing } from '../utils/theme';
+import { colors, radius, spacing } from '../utils/theme';
 
 export const ProgressStep = ({ step, active, index, total }) => {
   const bgColor = active ? colors['primary-subtle'] : colors['surface-container-low'];
@@ -39,12 +39,12 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: spacing['space-sm'],
   },
   circle: {
-    width: 26,
-    height: 26,
+    width: 28,
+    height: 28,
     borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.outline,
@@ -55,7 +55,7 @@ const styles = StyleSheet.create({
   circleText: {
     fontSize: 12,
     fontWeight: '700',
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    fontFamily: 'Inter-SemiBold',
   },
   content: {
     flex: 1,
@@ -65,13 +65,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 2,
   },
   title: {
     color: colors['on-surface'],
     fontWeight: '600',
     fontSize: 14,
     lineHeight: 18,
-    fontFamily: 'PlusJakartaSans-Medium',
+    fontFamily: 'Inter-SemiBold',
   },
   activeTitle: {
     color: colors['on-surface'],
@@ -79,14 +80,14 @@ const styles = StyleSheet.create({
   status: {
     fontSize: 12,
     fontWeight: '500',
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Inter-Regular',
   },
   desc: {
     color: colors.muted,
     fontSize: 12,
     lineHeight: 16,
     fontWeight: '400',
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Inter-Regular',
     marginTop: 2,
   },
 });

@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
   },
   initial: {
     fontWeight: '700',
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    fontFamily: 'Inter-SemiBold',
     textAlign: 'center',
   },
 });

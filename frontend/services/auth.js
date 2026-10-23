@@ -58,23 +58,12 @@ const listeners = new Set();
  */
 export function openGoogleLogin() {
   return new Promise((resolve, reject) => {
-    if (!GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID.startsWith('YOUR_')) {
-      reject(new Error('Google Client ID not configured in app.json extra.googleClientId'));
-      return;
-    }
-
-    // Must match a redirect URI registered in Google Cloud Console.
-    // Mobile: custom scheme com.agriscan.ai://auth (no domain required).
-    const redirectUri = 'com.agriscan.ai://auth';
-
-    const authUrl =
-      'https://accounts.google.com/o/oauth2/v2/auth?' +
-      'client_id=' + encodeURIComponent(GOOGLE_CLIENT_ID) +
-      '&redirect_uri=' + encodeURIComponent(redirectUri) +
-      '&response_type=code' +
-      '&scope=openid email profile' +
-      '&access_type=offline' +
-      '&prompt=consent';
+    // The browser round-trip goes through the API (which holds the client
+    // secret and converts the code into a session). Google only accepts an
+    // http(s) redirect for "Web application" clients, so the API receives
+    // the code at /auth/google/callback and deep-links back into the app.
+    const startUrl = googleStartUrl();
+    const deepLink = 'com.agriscan.ai://auth';
 
     // RN 0.86: Linking.addEventListener returns a subscription object.
     // Linking.removeEventListener was REMOVED — always call sub.remove().
@@ -87,29 +76,112 @@ export function openGoogleLogin() {
 
     const handler = (event) => {
       const url = event.url;
-      if (!url || !url.startsWith(redirectUri)) return;
+      if (!url || !url.startsWith(deepLink)) return;
       cleanup();
-      try {
-        const urlObj = new URL(url);
-        const code = urlObj.searchParams.get('code');
-        const error = urlObj.searchParams.get('error');
-        if (error) {
-          reject(new Error('Google auth error: ' + (urlObj.searchParams.get('error_description') || error)));
-        } else if (code) {
-          resolve(code);
-        } else {
-          reject(new Error('No authorization code received'));
-        }
-      } catch (e) {
-        reject(new Error('Malformed redirect URL: ' + url));
+      const params = parseQueryString(url);
+      const { token, code, error } = params;
+      if (error) {
+        reject(new Error(params.error_description || error));
+      } else if (token) {
+        resolve({ token });
+      } else if (code) {
+        resolve({ code });
+      } else {
+        reject(new Error('Không nhận được thông tin đăng nhập từ Google.'));
       }
     };
 
     subscription = Linking.addEventListener('url', handler);
     // Safety timeout: abandon the flow after 5 minutes.
-    timeout = setTimeout(() => { cleanup(); reject(new Error('Authentication timed out')); }, 5 * 60 * 1000);
-    Linking.openURL(authUrl).catch((e) => { cleanup(); reject(e); });
+    timeout = setTimeout(() => { cleanup(); reject(new Error('Phiên đăng nhập đã hết thời gian chờ.')); }, 5 * 60 * 1000);
+    Linking.openURL(startUrl).catch((e) => { cleanup(); reject(e); });
   });
+}
+
+/**
+ * Finish a Google login started by openGoogleLogin().
+ * - { token } → the API already exchanged the code; store the session.
+ * - { code }  → legacy path: exchange it here.
+ */
+/**
+ * URL that begins the OAuth relay.
+ *
+ * Google rejects private-IP redirect URIs for web clients ("device_id and
+ * device_name are required for private IP"). On an Android emulator the API
+ * lives at 10.0.2.2:887, so we swap the host to localhost and rely on
+ * `adb reverse tcp:887 tcp:887` — localhost is a permitted redirect host.
+ * Set EXPO-less override: react-native-config GOOGLE_OAUTH_BASE if needed.
+ */
+function isPrivateHost(host) {
+  const h = String(host || '').toLowerCase();
+  if (h === 'localhost' || h === '0.0.0.0' || h === '[::1]' || h === '::1') return true;
+  return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|127\.)/.test(h);
+}
+
+/** Parse `scheme://host/path?k=v&k2=v2` without relying on URL. */
+function parseQueryString(url) {
+  const out = {};
+  const qIndex = url.indexOf('?');
+  if (qIndex === -1) return out;
+  url.slice(qIndex + 1).split('&').forEach((pair) => {
+    if (!pair) return;
+    const eq = pair.indexOf('=');
+    const rawKey = eq === -1 ? pair : pair.slice(0, eq);
+    const rawVal = eq === -1 ? '' : pair.slice(eq + 1);
+    try {
+      out[decodeURIComponent(rawKey)] = decodeURIComponent(rawVal.replace(/\+/g, ' '));
+    } catch { /* skip malformed pair */ }
+  });
+  return out;
+}
+
+function googleStartUrl() {
+  let base = getApiBase();
+  try {
+    const Config = require('react-native-config');
+    if (Config && Config.GOOGLE_OAUTH_BASE) return Config.GOOGLE_OAUTH_BASE + '/auth/google/start';
+  } catch { /* config not available */ }
+
+  // 1887 is the second published port (docker-compose) — ports below 1024
+  // cannot be reversed with `adb reverse`, hence 887 → 1887. Google only
+  // accepts the exact registered redirect URI, so EVERY dev host (localhost,
+  // 127.x, 10.0.2.2, LAN IP) must start the flow on the registered host:port.
+  // `adb reverse tcp:1887 tcp:1887` routes it back to the API container.
+  const match = /^https?:\/\/(\[[^\]]+\]|[^/:]+)(?::(\d+))?/.exec(base);
+  if (match && isPrivateHost(match[1])) {
+    base = 'http://localhost:1887';
+  }
+
+  return base + '/auth/google/start';
+}
+
+/**
+ * Friendly extra hint for the most common Google setup failure. The browser
+ * shows Google's own error page, so the app only sees "timeout" — this tells
+ * the developer exactly which console field to fill in.
+ */
+export function googleErrorHint(err) {
+  const msg = (err && err.message) || '';
+  if (/hết thời gian/i.test(msg) || /timed? ?out/i.test(msg)) {
+    return 'Kiểm tra Google Cloud Console → Credentials → OAuth client → Authorized redirect URIs, '
+      + 'phải có http://localhost:1887/auth/google/callback (emulator) hoặc '
+      + 'https://<domain>/auth/google/callback (production).';
+  }
+  return '';
+}
+
+export async function finishGoogleLogin(result) {
+  if (result && result.token) {
+    sessionToken = result.token;
+    try { await SecureStore?.setItemAsync(TOKEN_KEY, result.token); } catch { /* non-fatal */ }
+    const user = await verifySession();
+    notifyListeners();
+    return { token: result.token, user };
+  }
+  if (result && result.code) {
+    return sendAuthCode(result.code);
+  }
+  throw new Error('Không nhận được thông tin đăng nhập từ Google.');
 }
 
 /**

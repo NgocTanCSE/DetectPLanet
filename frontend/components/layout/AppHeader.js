@@ -4,15 +4,20 @@
  * Flat header with back-arrow icon + text buttons. A subtle green dot serves
  * as the brand mark when the back button is hidden. All title/subtitle text
  * uses numberOfLines={1} to prevent line wrapping.
+ *
+ * On the white canvas: header background is white, text is dark,
+ * active accent is green.  Hover states on web lighten interactive buttons.
  */
 import React, { useState, useEffect } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Platform, StatusBar } from 'react-native';
-import { colors, typography, z } from '../../utils/theme';
+import { colors, typography, z, interactive, radius } from '../../utils/theme';
 import Icon from '../../icons';
 import { getCurrentUser } from '../../services/auth';
 
-export const HEADER_HEIGHT = 44;
+export const HEADER_HEIGHT = 48;
 export const DESKTOP_BREAKPOINT = 768;
+
+const isWeb = Platform.OS === 'web';
 
 /**
  * Cross-platform top inset.
@@ -47,10 +52,9 @@ const AppHeader = ({
 }) => {
   const topInset = useTopInset();
   const user = getCurrentUser();
+  const [hoveredIdx, setHoveredIdx] = useState(null);
 
-  const webCursor = Platform.OS === 'web'
-    ? { cursor: 'pointer', userSelect: 'none' }
-    : {};
+  const webCursor = isWeb ? { cursor: 'pointer', userSelect: 'none' } : {};
 
   return (
     <View
@@ -64,8 +68,10 @@ const AppHeader = ({
           {showBack ? (
             <TouchableOpacity
               accessibilityLabel="Quay lại"
-              style={[styles.textBtn, webCursor, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-              onPress={onBack}>
+              style={[styles.textBtn, webCursor, hoveredIdx === 'back' && isWeb && interactive.hover.surface, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+              onPress={onBack}
+              onMouseEnter={() => isWeb && setHoveredIdx('back')}
+              onMouseLeave={() => isWeb && setHoveredIdx(null)}>
               <Icon name="arrow_back_ios_new" size={16} color={colors['on-surface']} />
               <Text style={[typography.body.md, { color: colors['on-surface'], fontWeight: '500' }]}
                 numberOfLines={1}>
@@ -82,8 +88,6 @@ const AppHeader = ({
             </View>
           )}
 
-          {/* When showBack=false, the title already appears in the brandMark above.
-              Only render the separate title/subtitle View when showBack=true to avoid duplication. */}
           {showBack ? (
             <View>
               <Text style={styles.title} numberOfLines={2}>{title}</Text>
@@ -100,8 +104,10 @@ const AppHeader = ({
             <TouchableOpacity
               key={a.label || i}
               accessibilityLabel={a.label}
-              style={[styles.textBtn, webCursor, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-              onPress={a.onPress}>
+              style={[styles.textBtn, webCursor, { flexDirection: 'row', alignItems: 'center', gap: 4 }, hoveredIdx === i && isWeb && interactive.hover.surface]}
+              onPress={a.onPress}
+              onMouseEnter={() => isWeb && setHoveredIdx(i)}
+              onMouseLeave={() => isWeb && setHoveredIdx(null)}>
               {a.icon && <Icon name={a.icon} size={16} color={colors['on-surface-variant']} />}
               <Text style={[typography.body.md, { color: colors['on-surface-variant'], fontWeight: '500' }]}
                 numberOfLines={1}>
@@ -139,8 +145,8 @@ const styles = StyleSheet.create({
     zIndex: z.header,
   },
   headerInner: {
-    height: 44,
-    paddingHorizontal: 12,
+    height: 48,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -148,63 +154,64 @@ const styles = StyleSheet.create({
   left: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
     flexShrink: 1,
   },
   brandMark: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    marginRight: 8,
+    gap: 8,
+    marginRight: 10,
   },
   greenDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: colors.primary,
   },
   textBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: radius.sm,
   },
   title: {
     color: colors['on-surface'],
     fontSize: 16,
     lineHeight: 20,
     fontWeight: '600',
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    fontFamily: 'Inter-SemiBold',
   },
   subtitle: {
     color: colors.muted,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '500',
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Inter-Regular',
   },
   right: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 8,
     flexShrink: 0,
   },
   profile: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
   },
   profileFallback: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: colors['primary-subtle'],
     alignItems: 'center',
     justifyContent: 'center',
   },
   profileInitial: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: colors.primary,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    fontFamily: 'Inter-SemiBold',
   },
 });
 

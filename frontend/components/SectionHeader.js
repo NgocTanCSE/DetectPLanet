@@ -3,9 +3,11 @@
  *
  * Tiêu đề + phụ đề + hành động bên phải, dùng ở đầu mỗi phần màn hình.
  */
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { colors, typography, spacing } from '../utils/theme';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { colors, typography, spacing, interactive, radius } from '../utils/theme';
+
+const isWeb = Platform.OS === 'web';
 
 export const SectionHeader = ({
   title,
@@ -17,17 +19,19 @@ export const SectionHeader = ({
   titleStyle,
   subtitleStyle,
 }) => {
+  const [hovered, setHovered] = useState(false);
+
   return (
     <View style={[styles.wrapper, style]}>
       <View style={styles.content}>
         <Text style={[styles.title, titleStyle]} numberOfLines={1}>
           {title}
         </Text>
-        {subtitle && (
+        {subtitle ? (
           <Text style={[styles.subtitle, subtitleStyle]} numberOfLines={1}>
             {subtitle}
           </Text>
-        )}
+        ) : null}
       </View>
       {actionLabel && (
         <TouchableOpacity
@@ -36,7 +40,9 @@ export const SectionHeader = ({
           accessibilityRole="button"
           activeOpacity={0.8}
           onPress={onAction}
-          style={styles.action}>
+          style={[styles.action, hovered && isWeb && interactive.hover.surface]}
+          onMouseEnter={() => isWeb && setHovered(true)}
+          onMouseLeave={() => isWeb && setHovered(false)}>
           <Text style={styles.actionText} numberOfLines={1}>
             {actionLabel}
           </Text>
@@ -62,26 +68,29 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 16,
     lineHeight: 20,
-    fontFamily: 'PlusJakartaSans-SemiBold',
+    fontFamily: 'Inter-SemiBold',
   },
   subtitle: {
     color: colors.muted,
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '500',
-    fontFamily: 'PlusJakartaSans-Regular',
+    fontFamily: 'Inter-Regular',
     marginTop: 2,
   },
   action: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: radius.sm,
   },
   actionText: {
     color: colors.primary,
     fontWeight: '600',
     fontSize: 14,
-    fontFamily: 'PlusJakartaSans-Medium',
+    fontFamily: 'Inter-SemiBold',
   },
 });
 
