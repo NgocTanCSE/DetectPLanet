@@ -266,6 +266,10 @@
 	[
 		{
 			"backtrace" : 4,
+			"id" : "react_codegen_RNImagePickerSpec::@f66ee9a2efecfb28bee4"
+		},
+		{
+			"backtrace" : 4,
 			"id" : "react_codegen_RNCConfigSpec::@89f1b79ed4954e2f2cff"
 		},
 		{
@@ -275,10 +279,6 @@
 		{
 			"backtrace" : 4,
 			"id" : "react_codegen_rnsvg::@4f40eb209d0c0b4a3b65"
-		},
-		{
-			"backtrace" : 4,
-			"id" : "react_codegen_RNImagePickerSpec::@f66ee9a2efecfb28bee4"
 		}
 	],
 	"id" : "appmodules::@6890427a1f51a3e7e1df",

@@ -8,12 +8,13 @@
 11461	19834	1792741144047419643	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-svg/android/build/generated/source/codegen/jni/react/renderer/components/rnsvg/ComponentDescriptors.cpp.o	20d41e9439b04217
 7436	15680	1792741139860413794	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-svg/common/cpp/react/renderer/components/rnsvg/RNSVGImageShadowNode.cpp.o	99a09d707de206d8
 4789	13456	1792741137664410726	safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-safe-area-context/android/build/generated/source/codegen/jni/react/renderer/components/safeareacontext/Props.cpp.o	4aada4392436a811
-0	19074	1792741143210418473	CMakeFiles/appmodules.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	d01a2ed424686f6a
+3	79	1793070351585559106	build.ninja	f4c916156ed8056c
+5	5102	1792748662599967923	CMakeFiles/appmodules.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	d01a2ed424686f6a
 13456	19163	1792741143388418722	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-svg/android/build/generated/source/codegen/jni/react/renderer/components/rnsvg/EventEmitters.cpp.o	c76b06def3aa8730
 11365	18282	1792741142498417479	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-svg/common/cpp/react/renderer/components/rnsvg/RNSVGShadowNodes.cpp.o	d6ff97b564c83cbf
 9625	15373	1792741139591413418	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-svg/common/cpp/react/renderer/components/rnsvg/RNSVGLayoutableShadowNode.cpp.o	f539f005ac59608c
 13996	14154	1792741138391411742	/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/intermediates/cxx/Debug/z6n4z1e5/obj/x86_64/libreact_codegen_safeareacontext.so	8843992c891f8c86
-0	6638	1792741130847401203	CMakeFiles/appmodules.dir/OnLoad.cpp.o	cff432da27d9ad47
+5	1820	1792748659369261124	CMakeFiles/appmodules.dir/OnLoad.cpp.o	cff432da27d9ad47
 0	4789	1792741128990398609	RNCConfigSpec_autolinked_build/CMakeFiles/react_codegen_RNCConfigSpec.dir/RNCConfigSpec-generated.cpp.o	557c27708daa1c17
 7257	13014	1792741137180410050	safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-safe-area-context/android/build/generated/source/codegen/jni/safeareacontext-generated.cpp.o	f5f620b4c2e7b896
 4214	13466	1792741137632410681	safeareacontext_autolinked_build/CMakeFiles/react_codegen_safeareacontext.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-safe-area-context/android/build/generated/source/codegen/jni/react/renderer/components/safeareacontext/ComponentDescriptors.cpp.o	356944fe58d0bfcb
@@ -28,9 +29,5 @@
 0	3	0	/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86_64/CMakeFiles/cmake.verify_globs	482ddb6a0afac7a7
 14154	20664	1792741144896420829	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/node_modules/react-native-svg/android/build/generated/source/codegen/jni/react/renderer/components/rnsvg/ShadowNodes.cpp.o	67ef5aede06a418c
 13016	20114	1792741144338420049	rnsvg_autolinked_build/CMakeFiles/react_codegen_rnsvg.dir/rnsvg.cpp.o	834571ea7dff01f0
-21424	21496	1792741145737422004	/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/intermediates/cxx/Debug/z6n4z1e5/obj/x86_64/libappmodules.so	f782e20b9fe5a1e0
-3	79	1792748657556095858	build.ninja	f4c916156ed8056c
-0	3	0	/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86_64/CMakeFiles/cmake.verify_globs	482ddb6a0afac7a7
-5	1820	1792748659369261124	CMakeFiles/appmodules.dir/OnLoad.cpp.o	cff432da27d9ad47
-5	5102	1792748662599967923	CMakeFiles/appmodules.dir/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/generated/autolinking/src/main/jni/autolinking.cpp.o	d01a2ed424686f6a
 5102	5213	1792748662772570129	/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/build/intermediates/cxx/Debug/z6n4z1e5/obj/x86_64/libappmodules.so	f782e20b9fe5a1e0
+1	5	0	/home/ngoctan/Downloads/DetectPLanet/frontend_admin/android/app/.cxx/Debug/z6n4z1e5/x86_64/CMakeFiles/cmake.verify_globs	482ddb6a0afac7a7

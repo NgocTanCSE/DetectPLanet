@@ -16,7 +16,8 @@ Expo SDK is fully removed — no `expo*` packages remain in `package.json`.
 npm start                  # Metro dev server
 npm run android            # Run on connected emulator/device
 npm run android:reverse    # adb reverse 8081 (Metro) + 1887 (Google OAuth relay)
-npm run android:release    # Local production APK
+npm run android:release    # Local production APK (build only, does not install)
+npm run android:install    # Build APK + adb install -r
 npm run validate           # Module + render validation (19/19, 14/14)
 npm run web:bundle         # Bundle for web E2E
 npm run web:serve          # Serve web on :8081
@@ -216,3 +217,40 @@ Quy ước khi thêm mới:
   không animate.
 - Hướng chuyển trang do `getTransitionDirection(from, to)` trong `App.js` quyết định;
   thêm màn mới thì bổ sung vào `SCREEN_TAB_INDEX` nếu nó thuộc một tab.
+
+## Lỗi thường gặp khi chạy dev
+
+**1. Metro báo `An unknown error occurred while installing React Native DevTools` +
+`The SUID sandbox helper binary ... chrome-sandbox is owned by root and has mode 4755`.**
+Electron của DevTools cần `chrome-sandbox` thuộc root. Sửa một lần:
+
+```bash
+sudo chown root:root ~/.cache/dotslash/64/*/React\ Native\ DevTools-linux-x64/chrome-sandbox
+sudo chmod 4755 ~/.cache/dotslash/64/*/React\ Native\ DevTools-linux-x64/chrome-sandbox
+```
+
+Không có sudo thì chạy tạm: `ELECTRON_DISABLE_SANDBOX=1 npm start`
+(lỗi này **không** ảnh hưởng bundler — chỉ `j`/DevTools không mở được).
+
+**2. Trình duyệt trong emulator báo `localhost refused to connect` / `ERR_CONNECTION_REFUSED`
+ở `http://localhost:1887/auth/google/start`.**
+`adb reverse` bị mất mỗi lần khởi động lại emulator/adb. Chạy lại:
+
+```bash
+npm run android:reverse        # 8081 (Metro) + 1887 (Google OAuth relay)
+```
+
+**3. APK release mở lên nhưng mọi dữ liệu trống (`Chưa có dữ liệu`), không có request nào
+tới API.** Nguyên nhân: plugin Gradle của RN 0.86 ép
+`manifestPlaceholders["usesCleartextTraffic"]="false"` cho **mọi** build release, nên
+placeholder cũ trong `AndroidManifest.xml` làm release chặn toàn bộ HTTP tới
+`10.0.2.2:887`. Manifest giờ ghi cứng `android:usesCleartextTraffic="true"` — **đừng**
+đổi lại thành `${usesCleartextTraffic}`. Khi backend có domain HTTPS thì thay bằng
+`network_security_config`.
+
+**4. `npm run android:release` chỉ build APK, KHÔNG cài.** Dùng:
+
+```bash
+npm run android:install        # build + adb install -r
+```
+
